@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#0b0f12" />
+    <title>AIRLOCK // Agent Security Control</title>
+    <link rel="stylesheet" href="/static/styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="topbar">
+        <a class="brand" href="/" aria-label="AIRLOCK home">
+          <span class="brand-mark" aria-hidden="true"><span></span><span></span><span></span></span>
+          <span>
+            <strong>AIRLOCK</strong>
+            <small>POLICY GATEWAY</small>
+          </span>
+        </a>
+        <div class="topbar-meta">
+          <span class="connection"><i class="status-dot"></i><span id="connection-label">LOCAL LINK</span></span>
+          <span class="environment">DEV / ISOLATED</span>
+          <button class="icon-button" id="refresh-button" type="button" title="Refresh gateway state" aria-label="Refresh gateway state">↻</button>
+        </div>
+      </header>
+
+      <main class="dashboard">
+        <section class="intro-row" aria-labelledby="page-title">
+          <div class="intro-copy">
+            <p class="eyebrow">ZERO-TRUST CONTROL SURFACE <span class="eyebrow-slash">//</span> 01</p>
+            <h1 id="page-title">Agents can act.<br /><em>AIRLOCK decides how.</em></h1>
+            <p class="intro-lede">Every tool call is scored against intent, trust boundaries, and known attack signals before it can move.</p>
+          </div>
+          <div class="intro-actions">
+            <button class="button button-primary" id="run-demo-button" type="button"><span class="button-icon">▶</span> Run demo sequence</button>
+            <button class="button button-secondary" id="reset-button" type="button">Reset board</button>
+            <p class="action-note" id="action-status" role="status" aria-live="polite">Gateway ready for a local simulation.</p>
+          </div>
+        </section>
+
+        <section class="metric-grid" aria-label="Gateway overview">
+          <article class="metric-card score-card">
+            <div class="card-kicker"><span>01</span><span>AGENT SAFETY</span><span class="live-chip">LIVE</span></div>
+            <div class="score-layout">
+              <div class="score-ring" id="score-ring" style="--score: 0">
+                <div class="score-inner"><strong id="safety-score">—</strong><span>/100</span></div>
+              </div>
+              <div>
+                <p class="metric-caption" id="score-caption">Awaiting the first decision</p>
+                <p class="metric-helper">A higher score means fewer unresolved risk signals.</p>
+              </div>
+            </div>
+          </article>
+          <article class="metric-card threat-card">
+            <div class="card-kicker"><span>02</span><span>THREAT POSTURE</span><span class="signal-mark" aria-hidden="true"></span></div>
+            <div class="threat-word" id="threat-level">STANDBY</div>
+            <div class="threat-footer"><span id="threat-detail">No activity recorded</span><strong id="event-count">0 EVENTS</strong></div>
+          </article>
+          <article class="metric-card count-card">
+            <div class="card-kicker"><span>03</span><span>DECISION LEDGER</span></div>
+            <div class="count-row"><div><strong id="allowed-count">0</strong><span>ALLOWED</span></div><div><strong id="blocked-count">0</strong><span>BLOCKED</span></div><div><strong id="quarantine-count">0</strong><span>QUARANTINED</span></div></div>
+            <div class="meter" aria-label="Decision distribution"><span id="allow-meter"></span><span id="block-meter"></span><span id="quarantine-meter"></span></div>
+          </article>
+        </section>
+
+        <section class="workbench-grid">
+          <article class="panel timeline-panel">
+            <div class="panel-heading">
+              <div><p class="eyebrow">BLACK BOX / STREAM</p><h2>Activity timeline</h2></div>
+              <span class="panel-count" id="timeline-count">0 / 0</span>
+            </div>
+            <div class="timeline" id="timeline" aria-live="polite">
+              <div class="empty-state"><span class="empty-glyph">+</span><strong>No policy decisions yet</strong><span>Run the demo to populate the black box.</span></div>
+            </div>
+          </article>
+
+          <article class="panel trust-panel">
+            <div class="panel-heading">
+              <div><p class="eyebrow">BOUNDARY MAP</p><h2>Trust topology</h2></div>
+              <span class="legend"><i class="legend-dot trusted"></i>TRUSTED</span>
+            </div>
+            <div class="trust-map" aria-label="Agent trust boundary map">
+              <div class="map-grid"></div>
+              <div class="map-line line-one"></div><div class="map-line line-two"></div><div class="map-line line-three"></div>
+              <div class="map-node node-agent"><span class="node-pulse"></span><strong>AGENT</strong><small>REQUESTOR</small></div>
+              <div class="map-node node-policy"><span class="node-core">A</span><strong>POLICY</strong><small>DECISION LAYER</small></div>
+              <div class="map-node node-tools"><span class="node-core node-muted">T</span><strong>MOCK TOOLS</strong><small>NO SIDE EFFECTS</small></div>
+              <div class="map-node node-honey"><span class="node-core node-warn">H</span><strong>HONEYWORLD</strong><small>QUARANTINE ZONE</small></div>
+              <span class="map-label label-inspect">INSPECT</span><span class="map-label label-route">ROUTE</span><span class="map-label label-isolate">ISOLATE</span>
+            </div>
+            <div class="trust-footer"><span><i class="legend-dot trusted"></i>User intent boundary</span><span><i class="legend-dot warning"></i>Decoy boundary</span></div>
+          </article>
+        </section>
+
+        <section class="response-grid">
+          <article class="panel decision-panel" id="decision-panel">
+            <div class="panel-heading"><div><p class="eyebrow">LATEST VERDICT</p><h2>Decision output</h2></div><span class="decision-badge decision-neutral" id="latest-badge">WAITING</span></div>
+            <div class="decision-empty" id="decision-empty"><span class="decision-icon">◎</span><p>The gateway has not evaluated an action.</p><span>Latest reasoning will appear here.</span></div>
+            <div class="decision-content hidden" id="decision-content">
+              <div class="verdict-line"><strong id="latest-decision">—</strong><span id="latest-risk">RISK —</span></div>
+              <p class="decision-reason" id="latest-reason"></p>
+              <div class="finding-list" id="finding-list"></div>
+              <div class="action-facts"><span><small>ACTION</small><strong id="latest-action">—</strong></span><span><small>TARGET</small><strong id="latest-target">—</strong></span></div>
+            </div>
+          </article>
+
+          <article class="panel honey-panel">
+            <div class="panel-heading"><div><p class="eyebrow">DECOY RUNTIME</p><h2>HoneyWorld</h2></div><span class="sandbox-badge"><i></i>ACTIVE</span></div>
+            <div class="honey-summary"><div class="honey-orbit"><span class="orbit-dot"></span><span class="honey-letter">H</span></div><div><strong>Quarantine perimeter</strong><p id="honey-summary">Waiting for a suspicious action.</p></div></div>
+            <div class="honey-stats"><div><small>CAPTURES</small><strong id="capture-count">0</strong></div><div><small>NETWORK</small><strong class="safe-text">OFF</strong></div><div><small>SHELL</small><strong class="safe-text">OFF</strong></div></div>
+            <div class="capture-list" id="capture-list"><span class="muted-line">No decoy actions captured.</span></div>
+          </article>
+
+          <article class="panel immunity-panel">
+            <div class="panel-heading"><div><p class="eyebrow">ADAPTIVE DEFENSE</p><h2>Immunity rule</h2></div><span class="rule-count" id="rule-count">0 RULES</span></div>
+            <div id="immunity-content" class="immunity-empty"><span class="rule-shield">◇</span><strong>Rule generator idle</strong><span>Quarantine an action to mint a reusable fingerprint block.</span></div>
+          </article>
+        </section>
+
+        <section class="panel action-panel" aria-labelledby="action-heading">
+          <div class="panel-heading action-heading"><div><p class="eyebrow">MANUAL EVALUATION</p><h2 id="action-heading">Submit a tool call</h2><p class="panel-subtitle">Exercise the local policy gateway with a safe or suspicious fixture.</p></div><span class="local-only">LOCAL ONLY</span></div>
+          <form id="action-form" class="action-form">
+            <div class="field field-type"><label for="action-type">Action type</label><select id="action-type" name="action_type"><option value="read_file">read_file</option><option value="write_file">write_file</option><option value="run_command">run_command</option><option value="http_request">http_request</option><option value="github_action">github_action</option></select></div>
+            <div class="field field-target"><label for="action-target">Target</label><input id="action-target" name="target" value="/workspace/README.md" autocomplete="off" /></div>
+            <div class="field field-content"><label for="action-content">Content signal <span>(optional)</span></label><input id="action-content" name="content" placeholder="Paste a message or payload to inspect…" autocomplete="off" /></div>
+            <div class="form-actions"><button class="button button-primary" type="submit"><span class="button-icon">→</span> Evaluate action</button><button class="button button-ghost" type="button" id="safe-fixture">Load safe fixture</button><button class="button button-ghost warning-button" type="button" id="malicious-fixture">Load attack fixture</button></div>
+          </form>
+        </section>
+      </main>
+
+      <footer class="footer"><span>AIRLOCK / LOCAL POLICY GATEWAY</span><span>NO REAL SECRETS · NO EXTERNAL ACTIONS</span><span id="last-sync">SYNC —</span></footer>
+    </div>
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+    <script src="/static/app.js" defer></script>
+  </body>
+</html>
