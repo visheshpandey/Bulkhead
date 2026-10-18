@@ -3,188 +3,117 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="theme-color" content="#0b0f12" />
-    <meta name="description" content="AIRLOCK is a zero-trust security gateway for AI-agent tool calls." />
-    <meta property="og:title" content="AIRLOCK // Agent Security Control" />
-    <title>AIRLOCK // Agent Security Control</title>
-    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%23090c0e'/%3E%3Cpath d='M7 8h18M7 15h13M7 22h8' stroke='%23a6f26f' stroke-width='3'/%3E%3C/svg%3E" />
+    <meta name="theme-color" content="#f6f6f4" />
+    <meta name="description" content="AIRLOCK evaluates agent tool calls against declared intent and records every decision." />
+    <meta property="og:title" content="AIRLOCK — Agent policy gateway" />
+    <title>AIRLOCK — Agent policy gateway</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath d='M4 27 14 5h4l10 22M9 18h14' fill='none' stroke='%231b1d1c' stroke-width='3' stroke-linejoin='round'/%3E%3C/svg%3E" />
     <link rel="stylesheet" href="/static/styles.css" />
+    <script src="/static/app.js" defer></script>
   </head>
   <body>
     <div class="app-shell">
       <header class="topbar">
-        <a class="brand" href="/" aria-label="AIRLOCK home">
-          <span class="brand-mark" aria-hidden="true"><span></span><span></span><span></span></span>
-          <span>
-            <strong>AIRLOCK</strong>
-            <small>POLICY GATEWAY</small>
-          </span>
-        </a>
-        <div class="topbar-meta">
-          <span class="connection"><i class="status-dot"></i><span id="connection-label">LOCAL LINK</span></span>
-          <span class="request-rate" aria-label="Live request rate"><strong id="request-rate">0</strong> REQ/MIN</span>
-          <span class="environment">DEV / ISOLATED</span>
-          <button class="icon-button" id="refresh-button" type="button" title="Refresh gateway state" aria-label="Refresh gateway state">↻</button>
+        <a class="brand" href="#activity" aria-label="AIRLOCK activity">AIRLOCK</a>
+        <nav class="main-nav" aria-label="Main navigation">
+          <a href="#activity" data-page="activity" aria-current="page">Activity</a>
+          <a href="#test" data-page="test">Test</a>
+          <a href="#rules" data-page="rules">Rules</a>
+          <a href="#exports" data-page="exports">Exports</a>
+        </nav>
+        <div class="header-actions">
+          <span class="connection"><span class="connection-dot" aria-hidden="true"></span><span id="connection-label">Connecting</span></span>
+          <span class="request-rate"><span id="request-rate">0</span> req/min</span>
+          <button class="text-button refresh-button" id="refresh-button" type="button">Refresh</button>
+          <button class="text-button" id="theme-toggle" type="button" aria-label="Switch to dark theme">Dark mode</button>
+          <button class="button button-primary" id="run-demo-button" type="button">Run demo</button>
+          <button class="text-button" id="reset-button" type="button">Reset</button>
         </div>
       </header>
 
-      <main class="dashboard">
-        <section class="intro-row" aria-labelledby="page-title">
-          <div class="intro-copy">
-            <p class="eyebrow">ZERO-TRUST CONTROL SURFACE <span class="eyebrow-slash">//</span> 01</p>
-            <h1 id="page-title">Agents can act.<br /><em>AIRLOCK decides how.</em></h1>
-            <p class="intro-lede">Every tool call is scored against intent, trust boundaries, and known attack signals before it can move.</p>
-          </div>
-          <div class="intro-actions">
-            <button class="button button-primary" id="run-demo-button" type="button"><span class="button-icon">▶</span> Run demo sequence</button>
-            <button class="button button-secondary" id="reset-button" type="button">Reset board</button>
-            <p class="action-note" id="action-status" role="status" aria-live="polite">Gateway ready for a local simulation.</p>
-          </div>
-        </section>
+      <main>
+        <div class="demo-bar" id="demo-bar" hidden role="status" aria-live="polite">
+          <span id="demo-step">Demo ready</span>
+          <div class="demo-actions"><button class="button button-primary" id="demo-next" type="button">Next step</button><button class="text-button" id="demo-exit" type="button">Exit demo</button></div>
+        </div>
 
-        <section class="metric-grid" aria-label="Gateway overview">
-          <article class="metric-card score-card">
-            <div class="card-kicker"><span>01</span><span>AGENT SAFETY</span><span class="live-chip">LIVE</span></div>
-            <div class="score-layout">
-              <div class="score-ring" id="score-ring" style="--score: 0">
-                <div class="score-inner"><strong id="safety-score">—</strong><span>/100</span></div>
+        <section class="app-page" id="page-activity" aria-labelledby="activity-title">
+          <div class="page-heading"><div><h1 id="activity-title">Activity</h1><p id="summary-line">No requests evaluated yet.</p><p class="summary-detail" id="summary-detail">Safety score — · Threats contained 0</p></div><span class="event-count" id="event-count">0 events</span></div>
+          <div class="activity-grid">
+            <section class="panel log-panel" aria-labelledby="log-title">
+              <div class="section-heading"><h2 id="log-title">Decision log</h2></div>
+              <div class="filters">
+                <div class="field"><label for="decision-filter">Decision</label><select id="decision-filter"><option value="">All decisions</option><option value="allow">Allow</option><option value="block">Block</option><option value="quarantine">Quarantine</option></select></div>
+                <div class="field"><label for="action-filter">Action</label><select id="action-filter"><option value="">All actions</option><option value="read_file">read_file</option><option value="write_file">write_file</option><option value="run_command">run_command</option><option value="http_request">http_request</option><option value="github_action">github_action</option></select></div>
+                <div class="field search-field"><label for="search-filter">Search events</label><input id="search-filter" type="search" placeholder="Target, reason, or ID" autocomplete="off" /></div>
               </div>
-              <div>
-                <p class="metric-caption" id="score-caption">Awaiting the first decision</p>
-                <p class="metric-helper">A higher score means fewer unresolved risk signals.</p>
-              </div>
+              <div class="table-scroll"><table class="data-table log-table"><thead><tr><th scope="col">Time</th><th scope="col">Decision</th><th scope="col">Action</th><th scope="col">Target</th><th scope="col">Risk</th><th scope="col">Rule</th></tr></thead><tbody id="log-body"></tbody></table></div>
+              <div class="empty-state" id="activity-empty"><p>No decisions yet.</p><button class="button button-secondary" id="empty-demo-button" type="button">Run demo</button></div>
+            </section>
+            <aside class="activity-sidebar" aria-label="Latest decision and routing">
+              <section class="panel" aria-labelledby="latest-title">
+                <h2 id="latest-title">Latest decision</h2>
+                <div class="decision-line"><strong id="latest-decision">—</strong><span id="latest-risk">Risk —</span></div>
+                <p class="reason" id="latest-reason">The next evaluation will appear here.</p>
+                <dl class="facts"><div><dt>Action</dt><dd id="latest-action">—</dd></div><div><dt>Target</dt><dd id="latest-target">—</dd></div></dl>
+                <h3>Findings</h3><ul class="finding-list" id="finding-list"><li>No findings yet.</li></ul>
+              </section>
+              <section class="panel routing-panel" aria-labelledby="routing-title">
+                <h2 id="routing-title">Request routing</h2>
+                <svg id="flow-diagram" class="flow-diagram" viewBox="0 0 440 178" role="img" aria-labelledby="flow-title flow-desc" preserveAspectRatio="xMidYMid meet">
+                  <title id="flow-title">Agent request routing</title><desc id="flow-desc">Agent requests reach AIRLOCK. Approved requests continue to tools; quarantined requests go to the HoneyWorld decoy.</desc>
+                  <defs><marker id="flow-arrow" viewBox="0 0 8 8" refX="8" refY="4" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0 L8 4 L0 8 Z" /></marker></defs>
+                  <path class="route-in" d="M108 70 H150" marker-end="url(#flow-arrow)" />
+                  <path class="route-tools" d="M270 70 H322" marker-end="url(#flow-arrow)" />
+                  <path class="route-honey" d="M210 96 V148 H322" marker-end="url(#flow-arrow)" />
+                  <rect class="box-agent" x="12" y="44" width="96" height="52" rx="4" /><text x="60" y="75" text-anchor="middle">Agent</text>
+                  <rect class="box-airlock" x="150" y="44" width="120" height="52" rx="4" /><text x="210" y="75" text-anchor="middle">AIRLOCK</text>
+                  <rect class="box-tools" x="322" y="44" width="106" height="52" rx="4" /><text x="375" y="75" text-anchor="middle">Tools</text>
+                  <rect class="box-honey" x="322" y="126" width="106" height="44" rx="4" /><text x="375" y="145" text-anchor="middle">HoneyWorld</text><text class="flow-note" x="375" y="160" text-anchor="middle">(decoy)</text>
+                </svg>
+                <p class="meta" id="honey-summary">No actions routed to the decoy.</p>
+                <details class="disclosure"><summary>Captured actions</summary><ul id="capture-list"><li>No captures yet.</li></ul></details>
+                <details class="disclosure" id="containment-comparison"><summary>Without vs with AIRLOCK</summary><dl class="comparison"><div><dt>Without AIRLOCK</dt><dd id="without-action">No action evaluated</dd></div><div><dt>With AIRLOCK</dt><dd id="with-action">Awaiting decision</dd></div></dl></details>
+              </section>
+            </aside>
+          </div>
+        </section>
+
+        <section class="app-page" id="page-test" aria-labelledby="test-title" hidden>
+          <div class="page-heading"><div><h1 id="test-title">Test</h1><p>Evaluate a tool call against the current intent or run a prepared scenario.</p></div></div>
+          <div class="test-grid">
+            <aside class="panel scenario-panel" aria-labelledby="scenario-title"><h2 id="scenario-title">Scenarios</h2><div class="scenario-list" id="scenario-list"></div><button class="button button-secondary full-button" id="run-all-scenarios" type="button">Run all scenarios</button><p class="meta" id="batch-summary" role="status" aria-live="polite"></p></aside>
+            <div class="test-main">
+              <form id="action-form" class="panel action-form" novalidate>
+                <fieldset class="form-section"><legend>Intent</legend><p class="meta">Set the boundary for the agent's current goal.</p>
+                  <div class="field"><label for="intent-goal">Goal</label><textarea id="intent-goal" rows="2" required aria-describedby="intent-goal-error" placeholder="Describe the agent's task"></textarea><span class="field-error" id="intent-goal-error" role="alert"></span></div>
+                  <fieldset class="action-checks"><legend>Allowed actions</legend><label><input type="checkbox" name="intent-action" value="read_file" checked /> read_file</label><label><input type="checkbox" name="intent-action" value="write_file" /> write_file</label><label><input type="checkbox" name="intent-action" value="run_command" /> run_command</label><label><input type="checkbox" name="intent-action" value="http_request" /> http_request</label><label><input type="checkbox" name="intent-action" value="github_action" /> github_action</label></fieldset>
+                  <div class="field-pair"><div class="field"><label for="allowed-paths">Allowed paths <span class="hint">one prefix per line</span></label><textarea id="allowed-paths" rows="3" placeholder="/workspace/"></textarea></div><div class="field"><label for="denied-paths">Denied paths <span class="hint">one prefix per line</span></label><textarea id="denied-paths" rows="3" placeholder="/workspace/.env"></textarea></div></div>
+                  <label class="checkbox-row"><input id="allow-network" type="checkbox" /> Allow network requests</label>
+                  <div class="form-actions"><button class="text-button" id="default-intent" type="button">Reset to default</button><span class="meta" id="intent-status" role="status" aria-live="polite"></span></div>
+                </fieldset>
+                <fieldset class="form-section"><legend>Action</legend><p class="meta">Evaluate a proposed action with local mock tools.</p>
+                  <div class="field-pair"><div class="field"><label for="action-type">Action type</label><select id="action-type" name="action_type"><option value="read_file">read_file</option><option value="write_file">write_file</option><option value="run_command">run_command</option><option value="http_request">http_request</option><option value="github_action">github_action</option></select></div><div class="field"><label for="action-target">Target</label><input id="action-target" name="target" value="/workspace/README.md" required autocomplete="off" aria-describedby="action-target-error" /><span class="field-error" id="action-target-error" role="alert"></span></div></div>
+                  <div class="field"><label for="action-content">Content <span class="hint">optional</span></label><textarea id="action-content" name="content" rows="2" placeholder="Message or content to inspect"></textarea></div>
+                  <div class="field"><label for="action-payload">Payload JSON <span class="hint">optional</span></label><textarea id="action-payload" name="payload" rows="2" placeholder='{"key":"value"}'></textarea></div>
+                   <div class="form-actions"><button class="button button-primary" id="evaluate-button" type="submit">Evaluate action</button><span class="meta keyboard-hint">Ctrl/Cmd + Enter</span><button class="text-button" id="safe-fixture" type="button">Load safe fixture</button><button class="text-button" id="malicious-fixture" type="button">Load attack fixture</button></div>
+                  <p class="meta" id="action-status" role="status" aria-live="polite"></p>
+                </fieldset>
+              </form>
+              <section class="panel result-panel" aria-labelledby="result-title"><h2 id="result-title">Result</h2><p id="test-result-summary">No action evaluated.</p><p class="meta" id="test-result-reason"></p><ul id="test-result-findings"></ul><pre id="test-result-output" aria-label="Tool output"></pre></section>
+              <section class="panel" id="scenario-results" aria-labelledby="scenario-results-title" hidden><h2 id="scenario-results-title">Scenario results</h2><div class="table-scroll"><table class="data-table"><thead><tr><th scope="col">Scenario</th><th scope="col">Expected</th><th scope="col">Got</th><th scope="col">Risk</th><th scope="col">Match</th></tr></thead><tbody id="scenario-results-body"></tbody></table></div></section>
             </div>
-          </article>
-          <article class="metric-card threat-card">
-            <div class="card-kicker"><span>02</span><span>THREAT POSTURE</span><span class="signal-mark" aria-hidden="true"></span></div>
-            <div class="threat-word" id="threat-level">STANDBY</div>
-            <div class="threat-footer"><span id="threat-detail">No activity recorded</span><strong id="event-count">0 EVENTS</strong></div>
-          </article>
-          <article class="metric-card count-card">
-            <div class="card-kicker"><span>03</span><span>DECISION LEDGER</span></div>
-            <div class="count-row"><div><strong id="allowed-count">0</strong><span>ALLOWED</span></div><div><strong id="blocked-count">0</strong><span>BLOCKED</span></div><div><strong id="quarantine-count">0</strong><span>QUARANTINED</span></div></div>
-            <div class="contained-stat"><strong id="threats-contained">0</strong><span>THREATS CONTAINED</span></div>
-            <div class="meter" aria-label="Decision distribution"><span id="allow-meter"></span><span id="block-meter"></span><span id="quarantine-meter"></span></div>
-          </article>
+          </div>
         </section>
 
-        <section class="workbench-grid">
-          <article class="panel timeline-panel">
-            <div class="panel-heading">
-              <div><p class="eyebrow">BLACK BOX / STREAM</p><h2>Activity timeline</h2></div>
-              <span class="panel-count" id="timeline-count">0 / 0</span>
-            </div>
-            <div class="timeline" id="timeline" aria-live="polite">
-              <div class="empty-state"><span class="empty-glyph">+</span><strong>No policy decisions yet</strong><span>Run the demo to populate the black box.</span></div>
-            </div>
-          </article>
+        <section class="app-page" id="page-rules" aria-labelledby="rules-title" hidden><div class="page-heading"><div><h1 id="rules-title">Rules</h1><p>Fingerprints generated from quarantined actions.</p></div><span class="event-count" id="rule-count">0 rules</span></div><section class="panel"><div class="table-scroll"><table class="data-table rules-table"><thead><tr><th scope="col">Rule</th><th scope="col">Fingerprint</th><th scope="col">Created from</th><th scope="col">Matches</th><th scope="col">Last matched</th><th scope="col">Enabled</th><th scope="col">Delete</th></tr></thead><tbody id="rules-list"></tbody></table></div><div class="empty-state" id="rules-empty"><p>No rules generated yet.</p></div></section></section>
 
-          <article class="panel trust-panel">
-            <div class="panel-heading">
-              <div><p class="eyebrow">BOUNDARY MAP</p><h2>Trust topology</h2></div>
-              <span class="legend"><i class="legend-dot trusted"></i>TRUSTED</span>
-            </div>
-            <div class="trust-map" aria-label="Agent trust boundary map">
-              <div class="map-grid"></div>
-              <div class="map-line line-one"></div><div class="map-line line-two"></div><div class="map-line line-three"></div>
-              <div class="map-node node-agent"><span class="node-pulse"></span><strong>AGENT</strong><small>REQUESTOR</small></div>
-              <div class="map-node node-policy"><span class="node-core">A</span><strong>POLICY</strong><small>DECISION LAYER</small></div>
-              <div class="map-node node-tools"><span class="node-core node-muted">T</span><strong>MOCK TOOLS</strong><small>NO SIDE EFFECTS</small></div>
-              <div class="map-node node-honey"><span class="node-core node-warn">H</span><strong>HONEYWORLD</strong><small>QUARANTINE ZONE</small></div>
-              <span class="map-label label-inspect">INSPECT</span><span class="map-label label-route">ROUTE</span><span class="map-label label-isolate">ISOLATE</span>
-            </div>
-            <div class="trust-footer"><span><i class="legend-dot trusted"></i>User intent boundary</span><span><i class="legend-dot warning"></i>Decoy boundary</span></div>
-          </article>
-        </section>
-
-        <section class="response-grid">
-          <article class="panel decision-panel" id="decision-panel">
-            <div class="panel-heading"><div><p class="eyebrow">LATEST VERDICT</p><h2>Decision output</h2></div><span class="decision-badge decision-neutral" id="latest-badge">WAITING</span></div>
-            <div class="decision-empty" id="decision-empty"><span class="decision-icon">◎</span><p>The gateway has not evaluated an action.</p><span>Latest reasoning will appear here.</span></div>
-            <div class="decision-content hidden" id="decision-content">
-              <div class="verdict-line"><strong id="latest-decision">—</strong><span id="latest-risk">RISK —</span></div>
-              <p class="decision-reason" id="latest-reason"></p>
-              <div class="finding-list" id="finding-list"></div>
-              <div class="action-facts"><span><small>ACTION</small><strong id="latest-action">—</strong></span><span><small>TARGET</small><strong id="latest-target">—</strong></span></div>
-            </div>
-          </article>
-
-          <article class="panel honey-panel">
-            <div class="panel-heading"><div><p class="eyebrow">DECOY RUNTIME</p><h2>HoneyWorld</h2></div><span class="sandbox-badge"><i></i>ACTIVE</span></div>
-            <div class="honey-summary"><div class="honey-orbit"><span class="orbit-dot"></span><span class="honey-letter">H</span></div><div><strong>Quarantine perimeter</strong><p id="honey-summary">Waiting for a suspicious action.</p></div></div>
-            <div class="honey-stats"><div><small>CAPTURES</small><strong id="capture-count">0</strong></div><div><small>NETWORK</small><strong class="safe-text">OFF</strong></div><div><small>SHELL</small><strong class="safe-text">OFF</strong></div></div>
-            <div class="capture-list" id="capture-list"><span class="muted-line">No decoy actions captured.</span></div>
-          </article>
-
-          <article class="panel immunity-panel">
-            <div class="panel-heading"><div><p class="eyebrow">ADAPTIVE DEFENSE</p><h2>Immunity rule</h2></div><span class="rule-count" id="rule-count">0 RULES</span></div>
-            <div id="immunity-content" class="immunity-empty"><span class="rule-shield">◇</span><strong>Rule generator idle</strong><span>Quarantine an action to mint a reusable fingerprint block.</span></div>
-          </article>
-        </section>
-
-        <section class="control-grid">
-          <article class="panel rules-panel" aria-labelledby="rules-heading">
-            <div class="panel-heading"><div><p class="eyebrow">INTENT BOUNDARY / EDITOR</p><h2 id="rules-heading">Rules editor</h2><p class="panel-subtitle">Describe the smallest boundary an agent needs for this task.</p></div><span class="local-only">ZERO TRUST</span></div>
-            <form id="rules-form" novalidate>
-              <div class="field full-field"><label for="intent-goal">Goal</label><textarea id="intent-goal" rows="2" required placeholder="What should the agent accomplish?"></textarea><span class="field-error" id="intent-goal-error" role="alert"></span></div>
-              <fieldset class="action-checks"><legend>Allowed actions</legend><label><input type="checkbox" name="intent-action" value="read_file" checked /> read_file</label><label><input type="checkbox" name="intent-action" value="write_file" /> write_file</label><label><input type="checkbox" name="intent-action" value="run_command" /> run_command</label><label><input type="checkbox" name="intent-action" value="http_request" /> http_request</label><label><input type="checkbox" name="intent-action" value="github_action" /> github_action</label></fieldset>
-              <div class="field"><label for="allowed-paths">Allowed paths <span>(one prefix per line)</span></label><textarea id="allowed-paths" rows="3" placeholder="/workspace/"></textarea></div>
-              <div class="field"><label for="denied-paths">Denied paths <span>(one prefix per line)</span></label><textarea id="denied-paths" rows="3" placeholder="/workspace/.env&#10;/root/"></textarea></div>
-              <label class="toggle-row" for="allow-network"><input id="allow-network" type="checkbox" /><span class="toggle-control" aria-hidden="true"></span><span><strong>Allow network requests</strong><small>Keep disabled unless the goal explicitly needs network access.</small></span></label>
-              <div class="editor-actions"><button class="button button-primary" type="submit">Apply intent</button><button class="button button-ghost" type="button" id="default-intent">Use default zero-trust intent</button></div>
-              <p class="inline-status" id="intent-status" role="status" aria-live="polite"></p>
-            </form>
-          </article>
-
-          <article class="panel attack-panel" aria-labelledby="attack-heading">
-            <div class="panel-heading"><div><p class="eyebrow">RED TEAM / FIXTURES</p><h2 id="attack-heading">Attack library</h2><p class="panel-subtitle">Load a synthetic scenario and compare it with the expected policy decision.</p></div><span class="local-only">NO SIDE EFFECTS</span></div>
-            <div class="field"><label for="attack-preset">Scenario preset</label><select id="attack-preset" aria-describedby="attack-expected"></select></div>
-            <div class="preset-preview"><span class="preset-tag" id="attack-category">SAFE</span><strong id="attack-name">—</strong><p id="attack-description">Choose a fixture to inspect.</p><div class="expected-row"><span>EXPECTED DECISION</span><strong id="attack-expected">—</strong></div></div>
-            <div class="editor-actions"><button class="button button-ghost" type="button" id="load-attack-preset">Load into evaluator</button><button class="button button-primary" type="button" id="evaluate-attack-preset">Evaluate preset</button></div>
-            <p class="inline-status" id="attack-status" role="status" aria-live="polite"></p>
-          </article>
-        </section>
-
-        <section class="compare-grid">
-          <article class="panel compare-panel" aria-labelledby="compare-heading">
-            <div class="panel-heading"><div><p class="eyebrow">COUNTERFACTUAL / GUARDRAIL</p><h2 id="compare-heading">Without vs with AIRLOCK</h2></div><span class="panel-count">LIVE COMPARISON</span></div>
-             <div class="compare-columns"><div class="compare-column without"><span class="compare-label">WITHOUT AIRLOCK</span><strong id="without-action">No action evaluated</strong><p>Tool call proceeds with no intent or threat inspection.</p><span class="compare-state">UNINSPECTED</span></div><div class="compare-divider" aria-hidden="true">→</div><div class="compare-column with"><span class="compare-label">WITH AIRLOCK</span><strong id="with-action">Awaiting decision</strong><p id="with-detail">Every request is checked, recorded, and routed to a safe boundary.</p><span class="compare-state" id="with-state">PROTECTED</span></div></div>
-             <div class="quarantine-comparison" id="quarantine-comparison" hidden><div><span class="compare-label">LATEST QUARANTINED ACTION</span><strong id="quarantine-action">—</strong><p id="quarantine-detail">No quarantined action has been recorded.</p></div><div class="quarantine-result"><span class="compare-label">AIRLOCK ROUTE</span><strong>HONEYWORLD</strong><span id="quarantine-state">ISOLATED / OBSERVED</span></div></div>
-          </article>
-          <article class="panel export-panel" aria-labelledby="export-heading">
-            <div class="panel-heading"><div><p class="eyebrow">EVIDENCE / EXPORT</p><h2 id="export-heading">Audit exports</h2></div><span class="local-only">LOCAL FILES</span></div>
-            <p class="panel-subtitle">Download the persisted audit ledger for review or incident response.</p>
-            <div class="export-actions"><button class="button button-ghost" type="button" id="export-audit">Audit JSON</button><button class="button button-ghost" type="button" id="export-csv">Events CSV</button><button class="button button-ghost" type="button" id="export-incidents">Incident report</button><button class="button button-ghost" type="button" id="export-rules">Rules JSON</button></div>
-            <p class="inline-status" id="export-status" role="status" aria-live="polite"></p>
-          </article>
-        </section>
-
-        <section class="panel rules-list-panel" aria-labelledby="rules-list-heading">
-          <div class="panel-heading"><div><p class="eyebrow">ADAPTIVE DEFENSE / INVENTORY</p><h2 id="rules-list-heading">Immunity rules</h2></div><span class="rule-count" id="rule-count-secondary">0 RULES</span></div>
-          <div class="rules-list" id="rules-list"><p class="muted-line">No immunity rules generated yet.</p></div>
-        </section>
-
-        <section class="panel action-panel" aria-labelledby="action-heading">
-          <div class="panel-heading action-heading"><div><p class="eyebrow">MANUAL EVALUATION</p><h2 id="action-heading">Submit a tool call</h2><p class="panel-subtitle">Exercise the local policy gateway with a safe or suspicious fixture.</p></div><span class="local-only">LOCAL ONLY</span></div>
-          <form id="action-form" class="action-form">
-            <div class="field field-type"><label for="action-type">Action type</label><select id="action-type" name="action_type"><option value="read_file">read_file</option><option value="write_file">write_file</option><option value="run_command">run_command</option><option value="http_request">http_request</option><option value="github_action">github_action</option></select></div>
-             <div class="field field-target"><label for="action-target">Target</label><input id="action-target" name="target" value="/workspace/README.md" autocomplete="off" aria-describedby="action-target-error" aria-invalid="false" /><span class="field-error" id="action-target-error" role="alert"></span></div>
-              <div class="field field-content"><label for="action-content">Content signal <span>(optional)</span></label><input id="action-content" name="content" placeholder="Paste a message or payload to inspect…" autocomplete="off" /></div>
-              <div class="field full-field"><label for="action-payload">Payload JSON <span>(optional)</span></label><textarea id="action-payload" name="payload" rows="2" placeholder='{"api_key":"synthetic-demo-key"}'></textarea></div>
-            <div class="form-actions"><button class="button button-primary" type="submit"><span class="button-icon">→</span> Evaluate action</button><button class="button button-ghost" type="button" id="safe-fixture">Load safe fixture</button><button class="button button-ghost warning-button" type="button" id="malicious-fixture">Load attack fixture</button></div>
-          </form>
-        </section>
+        <section class="app-page" id="page-exports" aria-labelledby="exports-title" hidden><div class="page-heading"><div><h1 id="exports-title">Exports</h1><p>Download records or preview an individual incident report.</p></div></div><section class="panel export-panel" aria-labelledby="download-title"><h2 id="download-title">Download data</h2><p class="meta export-description">Audit JSON contains full events, Events CSV is a flat ledger, Rules JSON contains generated fingerprints, and Incident JSON lists incidents.</p><div class="export-actions"><button class="button button-secondary" id="export-audit" type="button">Audit JSON</button><button class="button button-secondary" id="export-csv" type="button">Events CSV</button><button class="button button-secondary" id="export-rules" type="button">Rules JSON</button><button class="button button-secondary" id="export-incidents" type="button">Incident JSON</button></div><p class="meta" id="export-status" role="status" aria-live="polite"></p></section><section class="panel report-panel" aria-labelledby="report-title"><h2 id="report-title">Incident preview</h2><div class="report-controls"><div class="field"><label for="report-select">Incident</label><select id="report-select"><option value="">Select an incident</option></select></div><button class="button button-secondary" id="download-report" type="button">Download report</button></div><pre id="incident-preview">No incident selected.</pre></section></section>
       </main>
-
-      <footer class="footer"><span>AIRLOCK / LOCAL POLICY GATEWAY</span><span>NO REAL SECRETS · NO EXTERNAL ACTIONS</span><span id="last-sync">SYNC —</span></footer>
+      <footer class="footer">AIRLOCK · Local policy gateway</footer>
     </div>
-    <div class="toast" id="toast" role="status" aria-live="polite"></div>
-    <aside class="event-drawer" id="event-drawer" aria-labelledby="drawer-title" aria-hidden="true" role="dialog" aria-modal="true">
-      <div class="drawer-head"><div><p class="eyebrow">BLACK BOX / EVENT</p><h2 id="drawer-title">Event detail</h2></div><button class="icon-button" type="button" id="drawer-close" aria-label="Close event detail">×</button></div>
-      <div class="drawer-body" id="drawer-body"></div>
-      <div class="drawer-actions"><button class="button button-primary" type="button" id="copy-event-json">Copy JSON</button><button class="button button-ghost" type="button" id="drawer-close-secondary">Close</button></div>
-    </aside>
     <div class="drawer-backdrop" id="drawer-backdrop" hidden></div>
-    <script src="/static/app.js" defer></script>
+    <aside class="event-drawer" id="event-drawer" role="dialog" aria-modal="true" aria-labelledby="drawer-title" aria-hidden="true" hidden><div class="drawer-head"><h2 id="drawer-title">Event detail</h2><button class="text-button" id="drawer-close" type="button" aria-label="Close event detail">Close</button></div><div class="drawer-body" id="drawer-body"></div><div class="drawer-actions"><button class="button button-secondary" id="copy-event-json" type="button">Copy event JSON</button><button class="text-button" id="drawer-close-secondary" type="button">Close</button></div></aside>
+    <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
   </body>
 </html>

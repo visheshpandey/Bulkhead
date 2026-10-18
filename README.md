@@ -141,11 +141,32 @@ With the server running, execute the agent-facing standard-library demo:
 python examples/agent_demo.py
 ```
 
-It sends a safe read through `AirlockClient`, then submits a synthetic
-malicious webpage action through `client.guard`; the output shows the decision
-and whether HoneyWorld produced a simulated receipt. The dashboard's **Run
-demo sequence** button and `POST /api/demo` run the three-step flow described
-in [`docs/demo-script.md`](docs/demo-script.md).
+The example evaluates a safe read and a synthetic malicious webpage, then
+prints the containment and immunity decisions. It uses only simulated tools.
+The dashboard's **Run demo** button presents four steps with **Next**:
+safe read, quarantined attack, repeat blocked by a rule, and disguised repeat
+blocked by the same rule. `POST /api/demo` and its aliases retain the original
+three-step API response. See [`docs/demo-script.md`](docs/demo-script.md).
+
+## Dashboard
+
+The vanilla HTML/CSS/JavaScript interface has no build step or remote assets.
+It defaults to a light theme; **Dark mode** saves a local preference.
+
+- **Activity:** searchable, filterable decision log; keyboard row navigation;
+  full event drawer; routing diagram; persisted HoneyWorld receipts.
+- **Test:** editable intent and action, 15 grouped scenarios, expected/actual
+  comparisons, and **Run all scenarios**. Each batch uses a unique synthetic
+  content marker so previously learned rules do not spoil repeat test runs.
+  Tests create real audit events; they do not clear existing data or disable rules.
+- **Rules:** enable/disable with rollback on error, confirm deletion, inspect
+  fingerprints, and open the originating incident.
+- **Exports:** audit JSON, CSV, rule JSON, incident JSON, and individual Markdown
+  report preview/download.
+
+Use **Ctrl/Cmd+Enter** to evaluate on Test, arrow keys and **Enter** in the log,
+and **Esc** to close the drawer. **Reset** clears the board for all connected
+dashboards while keeping ID counters monotonic.
 
 ## Test and CI workflow
 
@@ -154,13 +175,30 @@ ruff check .
 python -m pytest
 ```
 
-GitHub Actions uses Python 3.11.9, installs `requirements.lock`, then runs
-those exact Ruff and pytest commands. The checks are offline after dependency
-installation.
+GitHub Actions uses Python 3.11.9 and the Node version pinned in `.nvmrc`, installs
+`requirements.lock`, then runs those exact Ruff and pytest commands. The checks
+are offline after dependency installation.
 
 With Node.js available, pytest also runs the dependency-free dashboard behavior
 tests; they can be run directly with `node --test tests/frontend.behavior.test.cjs`.
 That optional test is skipped on Python-only installations.
+
+For optional real-browser checks, install the separate pinned test dependencies
+inside the project's virtual environment and provision Chromium:
+
+```bash
+python -m pip install --requirement requirements-browser.lock
+python -m playwright install chromium
+python scripts/check_frontend.py
+```
+
+Chromium needs the operating system libraries listed by Playwright on Linux;
+the normal FastAPI container does not need browser packages. The browser check
+starts its own loopback server with an in-memory database, never touches the
+running demo database, checks all four pages at 1440/1024/375px, and saves light
+and dark screenshots to `artifacts/frontend/` (Git-ignored). It exercises all
+15 scenarios twice, the four demo steps, rules, exports, and a cross-client reset,
+and fails on console errors or page overflow.
 
 ## Project layout
 

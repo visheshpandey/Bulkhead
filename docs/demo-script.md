@@ -30,24 +30,24 @@ never executes a shell command, reads a host file, or makes a network request.
 
 ## Dashboard sequence, including the rule toggle
 
-1. Click **Reset board**. The SQLite ledger is cleared and HoneyWorld decoys
-   are reset.
-2. Click **Load safe fixture**, then **Evaluate action**. Confirm an `allow`
-   for `read_file` on `/workspace/README.md`.
-3. Click **Load attack fixture**, then **Evaluate action**. The synthetic
-   webpage text asks the agent to read `/workspace/.env` and send a fake secret
-   to `https://evil.invalid`.
-4. Confirm `quarantine`, prompt-injection and secret-exfiltration findings,
-   an incident, a generated immunity rule, and a HoneyWorld receipt with
-   `network_called: false` and `shell_called: false`.
-5. In the immunity-rule inventory, toggle the generated rule **off**. The
-   dashboard sends `PATCH /api/rules/{rule_id}` with `{"enabled": false}`.
-6. Evaluate the unchanged attack fixture again. With the rule disabled, the
-   action is quarantined again and a second incident/capture is recorded.
-7. Toggle the original rule **on** again. Evaluate the same fingerprint once
-   more; the result is `block` with `known_quarantined_action`.
-8. Click **Run demo sequence** to reset and replay the compact three-step
-   sequence. It ends with `allow → quarantine → block` and one active rule.
+1. Click **Run demo**. It resets the board and evaluates a safe README read.
+   Activity shows **Allowed** and the Agent → AIRLOCK → Tools route.
+2. Click **Next**. The synthetic webpage instruction targets `/workspace/.env`
+   and asks to send a fake secret to `https://evil.invalid`. The result is
+   **Quarantined**, with a HoneyWorld receipt and one new rule.
+3. Click the quarantine row. Show the findings, fake output, fingerprint,
+   incident and rule IDs, and full JSON. Close the drawer with **Esc**.
+4. Click **Next**. The identical attack is **Blocked** by the generated rule.
+5. Click **Next**. A leetspeak version is also **Blocked** by that rule after
+   content normalization. Click **Exit demo** to end the guided session.
+6. Open **Rules** and disable the rule. Open **Test**, choose **Load attack
+   fixture**, and evaluate. It is quarantined again; the disabled rule is reused.
+7. Re-enable the rule in **Rules** and evaluate the same fixture again in
+   **Test**. It is blocked. Delete asks for confirmation.
+8. In **Test**, reset the intent to default and click **Run all scenarios**.
+   The 15 fixtures match their declared expectations without clearing audit data.
+9. Open **Exports**, select an incident, preview the Markdown as plain text,
+   and download it. JSON/CSV downloads remain available on that page.
 
 ## API-driven sequence
 
