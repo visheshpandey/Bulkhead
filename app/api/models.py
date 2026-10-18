@@ -4,12 +4,14 @@ from __future__ import annotations
 
 from typing import Any
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from app.core.models import ActionType, AgentAction, DecisionResult, UserIntent
 
 
 class EvaluateRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     action: AgentAction | None = None
     intent: UserIntent = Field(default_factory=UserIntent)
     run_honeyworld: bool = True
@@ -42,3 +44,14 @@ class DemoResponse(BaseModel):
     status: str
     steps: list[DecisionResult]
     state: dict[str, Any]
+
+
+class RulePatch(BaseModel):
+    enabled: bool | None = None
+
+
+class ExportResponse(BaseModel):
+    events: list[dict[str, Any]] = Field(default_factory=list)
+    incidents: list[dict[str, Any]] = Field(default_factory=list)
+    immunity_rules: list[dict[str, Any]] = Field(default_factory=list)
+    honeyworld_captures: list[dict[str, Any]] = Field(default_factory=list)
