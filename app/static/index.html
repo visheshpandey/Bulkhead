@@ -4,7 +4,10 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="theme-color" content="#0b0f12" />
+    <meta name="description" content="AIRLOCK is a zero-trust security gateway for AI-agent tool calls." />
+    <meta property="og:title" content="AIRLOCK // Agent Security Control" />
     <title>AIRLOCK // Agent Security Control</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%23090c0e'/%3E%3Cpath d='M7 8h18M7 15h13M7 22h8' stroke='%23a6f26f' stroke-width='3'/%3E%3C/svg%3E" />
     <link rel="stylesheet" href="/static/styles.css" />
   </head>
   <body>
@@ -19,6 +22,7 @@
         </a>
         <div class="topbar-meta">
           <span class="connection"><i class="status-dot"></i><span id="connection-label">LOCAL LINK</span></span>
+          <span class="request-rate" aria-label="Live request rate"><strong id="request-rate">0</strong> REQ/MIN</span>
           <span class="environment">DEV / ISOLATED</span>
           <button class="icon-button" id="refresh-button" type="button" title="Refresh gateway state" aria-label="Refresh gateway state">↻</button>
         </div>
@@ -59,6 +63,7 @@
           <article class="metric-card count-card">
             <div class="card-kicker"><span>03</span><span>DECISION LEDGER</span></div>
             <div class="count-row"><div><strong id="allowed-count">0</strong><span>ALLOWED</span></div><div><strong id="blocked-count">0</strong><span>BLOCKED</span></div><div><strong id="quarantine-count">0</strong><span>QUARANTINED</span></div></div>
+            <div class="contained-stat"><strong id="threats-contained">0</strong><span>THREATS CONTAINED</span></div>
             <div class="meter" aria-label="Decision distribution"><span id="allow-meter"></span><span id="block-meter"></span><span id="quarantine-meter"></span></div>
           </article>
         </section>
@@ -117,12 +122,55 @@
           </article>
         </section>
 
+        <section class="control-grid">
+          <article class="panel rules-panel" aria-labelledby="rules-heading">
+            <div class="panel-heading"><div><p class="eyebrow">INTENT BOUNDARY / EDITOR</p><h2 id="rules-heading">Rules editor</h2><p class="panel-subtitle">Describe the smallest boundary an agent needs for this task.</p></div><span class="local-only">ZERO TRUST</span></div>
+            <form id="rules-form" novalidate>
+              <div class="field full-field"><label for="intent-goal">Goal</label><textarea id="intent-goal" rows="2" required placeholder="What should the agent accomplish?"></textarea><span class="field-error" id="intent-goal-error" role="alert"></span></div>
+              <fieldset class="action-checks"><legend>Allowed actions</legend><label><input type="checkbox" name="intent-action" value="read_file" checked /> read_file</label><label><input type="checkbox" name="intent-action" value="write_file" /> write_file</label><label><input type="checkbox" name="intent-action" value="run_command" /> run_command</label><label><input type="checkbox" name="intent-action" value="http_request" /> http_request</label><label><input type="checkbox" name="intent-action" value="github_action" /> github_action</label></fieldset>
+              <div class="field"><label for="allowed-paths">Allowed paths <span>(one prefix per line)</span></label><textarea id="allowed-paths" rows="3" placeholder="/workspace/"></textarea></div>
+              <div class="field"><label for="denied-paths">Denied paths <span>(one prefix per line)</span></label><textarea id="denied-paths" rows="3" placeholder="/workspace/.env&#10;/root/"></textarea></div>
+              <label class="toggle-row" for="allow-network"><input id="allow-network" type="checkbox" /><span class="toggle-control" aria-hidden="true"></span><span><strong>Allow network requests</strong><small>Keep disabled unless the goal explicitly needs network access.</small></span></label>
+              <div class="editor-actions"><button class="button button-primary" type="submit">Apply intent</button><button class="button button-ghost" type="button" id="default-intent">Use default zero-trust intent</button></div>
+              <p class="inline-status" id="intent-status" role="status" aria-live="polite"></p>
+            </form>
+          </article>
+
+          <article class="panel attack-panel" aria-labelledby="attack-heading">
+            <div class="panel-heading"><div><p class="eyebrow">RED TEAM / FIXTURES</p><h2 id="attack-heading">Attack library</h2><p class="panel-subtitle">Load a synthetic scenario and compare it with the expected policy decision.</p></div><span class="local-only">NO SIDE EFFECTS</span></div>
+            <div class="field"><label for="attack-preset">Scenario preset</label><select id="attack-preset" aria-describedby="attack-expected"></select></div>
+            <div class="preset-preview"><span class="preset-tag" id="attack-category">SAFE</span><strong id="attack-name">—</strong><p id="attack-description">Choose a fixture to inspect.</p><div class="expected-row"><span>EXPECTED DECISION</span><strong id="attack-expected">—</strong></div></div>
+            <div class="editor-actions"><button class="button button-ghost" type="button" id="load-attack-preset">Load into evaluator</button><button class="button button-primary" type="button" id="evaluate-attack-preset">Evaluate preset</button></div>
+            <p class="inline-status" id="attack-status" role="status" aria-live="polite"></p>
+          </article>
+        </section>
+
+        <section class="compare-grid">
+          <article class="panel compare-panel" aria-labelledby="compare-heading">
+            <div class="panel-heading"><div><p class="eyebrow">COUNTERFACTUAL / GUARDRAIL</p><h2 id="compare-heading">Without vs with AIRLOCK</h2></div><span class="panel-count">LIVE COMPARISON</span></div>
+             <div class="compare-columns"><div class="compare-column without"><span class="compare-label">WITHOUT AIRLOCK</span><strong id="without-action">No action evaluated</strong><p>Tool call proceeds with no intent or threat inspection.</p><span class="compare-state">UNINSPECTED</span></div><div class="compare-divider" aria-hidden="true">→</div><div class="compare-column with"><span class="compare-label">WITH AIRLOCK</span><strong id="with-action">Awaiting decision</strong><p id="with-detail">Every request is checked, recorded, and routed to a safe boundary.</p><span class="compare-state" id="with-state">PROTECTED</span></div></div>
+             <div class="quarantine-comparison" id="quarantine-comparison" hidden><div><span class="compare-label">LATEST QUARANTINED ACTION</span><strong id="quarantine-action">—</strong><p id="quarantine-detail">No quarantined action has been recorded.</p></div><div class="quarantine-result"><span class="compare-label">AIRLOCK ROUTE</span><strong>HONEYWORLD</strong><span id="quarantine-state">ISOLATED / OBSERVED</span></div></div>
+          </article>
+          <article class="panel export-panel" aria-labelledby="export-heading">
+            <div class="panel-heading"><div><p class="eyebrow">EVIDENCE / EXPORT</p><h2 id="export-heading">Audit exports</h2></div><span class="local-only">LOCAL FILES</span></div>
+            <p class="panel-subtitle">Download the persisted audit ledger for review or incident response.</p>
+            <div class="export-actions"><button class="button button-ghost" type="button" id="export-audit">Audit JSON</button><button class="button button-ghost" type="button" id="export-csv">Events CSV</button><button class="button button-ghost" type="button" id="export-incidents">Incident report</button><button class="button button-ghost" type="button" id="export-rules">Rules JSON</button></div>
+            <p class="inline-status" id="export-status" role="status" aria-live="polite"></p>
+          </article>
+        </section>
+
+        <section class="panel rules-list-panel" aria-labelledby="rules-list-heading">
+          <div class="panel-heading"><div><p class="eyebrow">ADAPTIVE DEFENSE / INVENTORY</p><h2 id="rules-list-heading">Immunity rules</h2></div><span class="rule-count" id="rule-count-secondary">0 RULES</span></div>
+          <div class="rules-list" id="rules-list"><p class="muted-line">No immunity rules generated yet.</p></div>
+        </section>
+
         <section class="panel action-panel" aria-labelledby="action-heading">
           <div class="panel-heading action-heading"><div><p class="eyebrow">MANUAL EVALUATION</p><h2 id="action-heading">Submit a tool call</h2><p class="panel-subtitle">Exercise the local policy gateway with a safe or suspicious fixture.</p></div><span class="local-only">LOCAL ONLY</span></div>
           <form id="action-form" class="action-form">
             <div class="field field-type"><label for="action-type">Action type</label><select id="action-type" name="action_type"><option value="read_file">read_file</option><option value="write_file">write_file</option><option value="run_command">run_command</option><option value="http_request">http_request</option><option value="github_action">github_action</option></select></div>
-            <div class="field field-target"><label for="action-target">Target</label><input id="action-target" name="target" value="/workspace/README.md" autocomplete="off" /></div>
-            <div class="field field-content"><label for="action-content">Content signal <span>(optional)</span></label><input id="action-content" name="content" placeholder="Paste a message or payload to inspect…" autocomplete="off" /></div>
+             <div class="field field-target"><label for="action-target">Target</label><input id="action-target" name="target" value="/workspace/README.md" autocomplete="off" aria-describedby="action-target-error" aria-invalid="false" /><span class="field-error" id="action-target-error" role="alert"></span></div>
+              <div class="field field-content"><label for="action-content">Content signal <span>(optional)</span></label><input id="action-content" name="content" placeholder="Paste a message or payload to inspect…" autocomplete="off" /></div>
+              <div class="field full-field"><label for="action-payload">Payload JSON <span>(optional)</span></label><textarea id="action-payload" name="payload" rows="2" placeholder='{"api_key":"synthetic-demo-key"}'></textarea></div>
             <div class="form-actions"><button class="button button-primary" type="submit"><span class="button-icon">→</span> Evaluate action</button><button class="button button-ghost" type="button" id="safe-fixture">Load safe fixture</button><button class="button button-ghost warning-button" type="button" id="malicious-fixture">Load attack fixture</button></div>
           </form>
         </section>
@@ -131,6 +179,12 @@
       <footer class="footer"><span>AIRLOCK / LOCAL POLICY GATEWAY</span><span>NO REAL SECRETS · NO EXTERNAL ACTIONS</span><span id="last-sync">SYNC —</span></footer>
     </div>
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
+    <aside class="event-drawer" id="event-drawer" aria-labelledby="drawer-title" aria-hidden="true" role="dialog" aria-modal="true">
+      <div class="drawer-head"><div><p class="eyebrow">BLACK BOX / EVENT</p><h2 id="drawer-title">Event detail</h2></div><button class="icon-button" type="button" id="drawer-close" aria-label="Close event detail">×</button></div>
+      <div class="drawer-body" id="drawer-body"></div>
+      <div class="drawer-actions"><button class="button button-primary" type="button" id="copy-event-json">Copy JSON</button><button class="button button-ghost" type="button" id="drawer-close-secondary">Close</button></div>
+    </aside>
+    <div class="drawer-backdrop" id="drawer-backdrop" hidden></div>
     <script src="/static/app.js" defer></script>
   </body>
 </html>
