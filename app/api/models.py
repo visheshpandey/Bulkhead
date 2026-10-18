@@ -7,13 +7,14 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from app.core.models import ActionType, AgentAction, DecisionResult, UserIntent
+from app.core.policy import DEFAULT_INTENT
 
 
 class EvaluateRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     action: AgentAction | None = None
-    intent: UserIntent = Field(default_factory=UserIntent)
+    intent: UserIntent = Field(default_factory=lambda: DEFAULT_INTENT.model_copy(deep=True))
     run_honeyworld: bool = True
     action_type: ActionType | None = None
     type: ActionType | None = None
@@ -22,6 +23,13 @@ class EvaluateRequest(BaseModel):
     content: str | None = None
     agent_id: str = "demo-agent"
     metadata: dict[str, Any] = Field(default_factory=dict)
+
+    @model_validator(mode="before")
+    @classmethod
+    def default_null_intent(cls, value: Any) -> Any:
+        if isinstance(value, dict) and value.get("intent", ...) is None:
+            return {**value, "intent": DEFAULT_INTENT.model_copy(deep=True)}
+        return value
 
     @model_validator(mode="after")
     def build_action(self) -> EvaluateRequest:

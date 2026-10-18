@@ -1,6 +1,10 @@
 """Offline smoke checks for the vanilla dashboard contract."""
 
+import shutil
+import subprocess
 from pathlib import Path
+
+import pytest
 
 ROOT = Path(__file__).parents[1]
 STATIC = ROOT / "app" / "static"
@@ -49,3 +53,14 @@ def test_dashboard_has_focus_and_loading_accessibility_hooks() -> None:
     assert 'event.key !== "Tab"' in script
     assert 'aria-busy' in script
     assert 'overflow-x: hidden' in styles
+
+
+def test_dashboard_behavior_offline() -> None:
+    node = shutil.which("node")
+    if node is None:
+        pytest.skip("Node.js is not installed")
+    subprocess.run(
+        [node, "--test", "tests/frontend.behavior.test.cjs"],
+        cwd=ROOT,
+        check=True,
+    )

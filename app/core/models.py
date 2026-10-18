@@ -207,6 +207,7 @@ class ImmunityRule(BaseModel):
 
 class AuditEvent(BaseModel):
     id: str
+    agent_id: str | None = None
     timestamp: datetime = Field(default_factory=utc_now)
     event_type: str = "policy_decision"
     action: AgentAction

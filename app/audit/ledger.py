@@ -9,19 +9,29 @@ from __future__ import annotations
 import json
 import os
 import sqlite3
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
-from queue import Queue
+from queue import Empty, Queue
 from threading import RLock
 from typing import Any, Self
 
 from app.core.models import AgentAction, AuditEvent, Decision, ImmunityRule, Incident, ThreatFinding
 
 
+@dataclass(frozen=True)
+class ResetMessage:
+    """A boundary between audit runs for live subscribers."""
+
+
+LedgerMessage = AuditEvent | ResetMessage
+RESET_MESSAGE = ResetMessage()
+
+
 class EventLedger:
     def __init__(self, db_path: str | None = None) -> None:
         self._lock = RLock()
-        self._subscribers: set[Queue[AuditEvent]] = set()
+        self._subscribers: set[Queue[LedgerMessage]] = set()
         self.db_path = db_path if db_path is not None else os.getenv("AIRLOCK_DB_PATH", "./data/airlock.db")
         if self.db_path != ":memory:":
             Path(self.db_path).expanduser().parent.mkdir(parents=True, exist_ok=True)
@@ -64,8 +74,23 @@ class EventLedger:
                     captured_at TEXT NOT NULL,
                     payload TEXT NOT NULL
                 );
+                CREATE TABLE IF NOT EXISTS id_counters (
+                    collection TEXT PRIMARY KEY,
+                    last_value INTEGER NOT NULL
+                );
                 """
             )
+            # Migrate old ledgers based on all IDs still present. From this point
+            # onward counters survive row deletion and reset.
+            for table in ("events", "incidents", "immunity_rules"):
+                prefix = {"events": "evt-", "incidents": "inc-", "immunity_rules": "immune-"}[table]
+                ids = self._connection.execute(f"SELECT id FROM {table}").fetchall()
+                highest = max((self._number(prefix, row[0]) for row in ids), default=0)
+                self._connection.execute(
+                    "INSERT INTO id_counters(collection, last_value) VALUES (?, ?) "
+                    "ON CONFLICT(collection) DO UPDATE SET last_value = MAX(last_value, excluded.last_value)",
+                    (table, highest),
+                )
 
     def reset(self) -> None:
         with getattr(self, "_lock", RLock()):
@@ -76,14 +101,15 @@ class EventLedger:
                 self._connection.execute("DELETE FROM incidents")
                 self._connection.execute("DELETE FROM immunity_rules")
                 self._connection.execute("DELETE FROM honeyworld_captures")
-                self._connection.execute(
-                    "DELETE FROM sqlite_sequence WHERE name = 'honeyworld_captures'"
-                )
             # A stream opened before a reset must not receive records from the
             # previous demo run after it reconnects.
             for subscriber in tuple(self._subscribers):
-                while not subscriber.empty():
-                    subscriber.get_nowait()
+                while True:
+                    try:
+                        subscriber.get_nowait()
+                    except Empty:
+                        break
+                subscriber.put_nowait(RESET_MESSAGE)
 
     def close(self) -> None:
         """Close the SQLite connection (useful for short-lived integrations)."""
@@ -100,15 +126,21 @@ class EventLedger:
 
     @staticmethod
     def _number(prefix: str, identifier: str) -> int:
+        if not identifier.startswith(prefix) or not identifier[len(prefix):].isdigit():
+            return 0
         try:
-            return int(identifier.removeprefix(prefix))
+            return int(identifier[len(prefix):])
         except ValueError:
             return 0
 
     def _next_id(self, table: str, prefix: str) -> str:
-        row = self._connection.execute(f"SELECT id FROM {table}").fetchall()
-        number = max((self._number(prefix, item[0]) for item in row), default=0) + 1
-        return f"{prefix}{number:04d}"
+        # Called inside the insert transaction: the first write obtains SQLite's
+        # writer lock, so separate ledger connections cannot allocate the same ID.
+        row = self._connection.execute(
+            "UPDATE id_counters SET last_value = last_value + 1 "
+            "WHERE collection = ? RETURNING last_value", (table,)
+        ).fetchone()
+        return f"{prefix}{row[0]:04d}"
 
     @staticmethod
     def _dump(model: Any) -> str:
@@ -127,18 +159,20 @@ class EventLedger:
         risk_score: int,
         findings: list[ThreatFinding],
         immunity_rule_id: str | None = None,
+        agent_id: str | None = None,
     ) -> AuditEvent:
         with self._lock:
-            event = AuditEvent(
-                id=self._next_id("events", "evt-"),
-                action=action,
-                decision=decision,
-                reason=reason,
-                risk_score=risk_score,
-                findings=findings,
-                immunity_rule_id=immunity_rule_id,
-            )
             with self._connection:
+                event = AuditEvent(
+                    id=self._next_id("events", "evt-"),
+                    agent_id=agent_id,
+                    action=action,
+                    decision=decision,
+                    reason=reason,
+                    risk_score=risk_score,
+                    findings=findings,
+                    immunity_rule_id=immunity_rule_id,
+                )
                 self._connection.execute(
                     "INSERT INTO events(id, timestamp, payload) VALUES (?, ?, ?)",
                     (event.id, event.timestamp.isoformat(), self._dump(event)),
@@ -147,13 +181,18 @@ class EventLedger:
                 subscriber.put_nowait(event)
             return event
 
-    def subscribe(self) -> Queue[AuditEvent]:
-        queue: Queue[AuditEvent] = Queue()
+    def subscribe(self) -> Queue[LedgerMessage]:
+        queue: Queue[LedgerMessage] = Queue()
         with self._lock:
             self._subscribers.add(queue)
         return queue
 
-    def unsubscribe(self, queue: Queue[AuditEvent]) -> None:
+    def subscribe_with_snapshot(self) -> tuple[Queue[LedgerMessage], list[AuditEvent]]:
+        with self._lock:
+            subscriber = self.subscribe()
+            return subscriber, self.events()
+
+    def unsubscribe(self, queue: Queue[LedgerMessage]) -> None:
         with self._lock:
             self._subscribers.discard(queue)
 
@@ -161,14 +200,14 @@ class EventLedger:
         self, action: AgentAction, findings: list[ThreatFinding], event_id: str, fingerprint: str
     ) -> Incident:
         with self._lock:
-            incident = Incident(
-                id=self._next_id("incidents", "inc-"),
-                action=action,
-                findings=findings,
-                event_id=event_id,
-                fingerprint=fingerprint,
-            )
             with self._connection:
+                incident = Incident(
+                    id=self._next_id("incidents", "inc-"),
+                    action=action,
+                    findings=findings,
+                    event_id=event_id,
+                    fingerprint=fingerprint,
+                )
                 self._connection.execute(
                     "INSERT INTO incidents(id, created_at, payload) VALUES (?, ?, ?)",
                     (incident.id, incident.created_at.isoformat(), self._dump(incident)),
@@ -187,13 +226,13 @@ class EventLedger:
             ).fetchone()
             if existing:
                 return self._load(ImmunityRule, existing[0])
-            rule = ImmunityRule(
-                id=self._next_id("immunity_rules", "immune-"),
-                fingerprint=fingerprint,
-                source_incident_id=incident.id,
-                description=f"Block the quarantined action fingerprint {fingerprint}.",
-            )
             with self._connection:
+                rule = ImmunityRule(
+                    id=self._next_id("immunity_rules", "immune-"),
+                    fingerprint=fingerprint,
+                    source_incident_id=incident.id,
+                    description=f"Block the quarantined action fingerprint {fingerprint}.",
+                )
                 self._connection.execute(
                     """INSERT INTO immunity_rules
                        (id, created_at, fingerprint, enabled, last_matched_at, match_count, payload)

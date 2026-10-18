@@ -14,7 +14,8 @@ def test_gateway_allows_action_inside_user_intent() -> None:
     )
 
     assert result.decision == Decision.ALLOW
-    assert result.event.id == "evt-0001"
+    assert result.event.id.startswith("evt-")
+    assert result.event.agent_id is None
     assert gateway.state()["incidents"] == []
 
 

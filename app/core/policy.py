@@ -172,6 +172,7 @@ class PolicyGateway:
         intent: UserIntent | None = None,
         *,
         run_honeyworld: bool = True,
+        agent_id: str | None = None,
     ) -> DecisionResult:
         intent = intent or DEFAULT_INTENT.model_copy(deep=True)
         fingerprint = self.fingerprint(action)
@@ -230,6 +231,7 @@ class PolicyGateway:
             risk_score=risk_score,
             findings=findings,
             immunity_rule_id=existing_rule.id if existing_rule else None,
+            agent_id=agent_id,
         )
         incident = None
         generated_rule = None
@@ -259,8 +261,9 @@ class PolicyGateway:
         )
 
     def reset(self) -> None:
-        self.ledger.reset()
         self.honeyworld.reset()
+        # Reset decoys before publishing the ledger reset to stream subscribers.
+        self.ledger.reset()
 
     def state(self) -> dict[str, Any]:
         events = self.ledger.events()

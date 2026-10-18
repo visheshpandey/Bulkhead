@@ -102,12 +102,22 @@ data is ignored by Git.
 | --- | --- | --- |
 | `GET` | `/health` | Liveness check. |
 | `GET` | `/api/state` | Events, incidents, rules, counts, and HoneyWorld state. |
+| `GET` | `/api/default-intent` | Canonical zero-trust intent used by the server and dashboard. |
+| `GET` | `/api/stream` | Live `audit_event` decisions and `reset` notifications (SSE). |
 | `GET` | `/api/events` | Black Box events. |
 | `POST` | `/api/evaluate` | Evaluate an action object or flat action fields. |
 | `POST` | `/api/demo` | Reset and run the deterministic `allow → quarantine → block` demo. |
 | `POST` | `/api/reset-demo` | Clear the SQLite-backed demo collections and reset HoneyWorld decoys. |
 | `GET` | `/api/attacks` | List the built-in synthetic attack presets. |
-| `GET/PATCH/DELETE` | `/api/rules` | Inspect or toggle/delete immunity rules. |
+| `GET` | `/api/rules` | List immunity rules. |
+| `PATCH/DELETE` | `/api/rules/{id}` | Toggle or delete an immunity rule. |
+
+Resets clear audit data but preserve persistent event, incident, and rule ID
+counters. Existing dashboards immediately clear on the SSE `reset` notification,
+then reload `/api/state`; they also reconcile state every three seconds.
+Send `X-Agent-Id` to record the caller in each event's top-level `agent_id` and
+CSV export. Missing headers are stored as JSON `null` (empty CSV cell), not
+inferred from the compatibility `action.agent_id` field.
 
 Example safe request:
 
@@ -147,6 +157,10 @@ python -m pytest
 GitHub Actions uses Python 3.11.9, installs `requirements.lock`, then runs
 those exact Ruff and pytest commands. The checks are offline after dependency
 installation.
+
+With Node.js available, pytest also runs the dependency-free dashboard behavior
+tests; they can be run directly with `node --test tests/frontend.behavior.test.cjs`.
+That optional test is skipped on Python-only installations.
 
 ## Project layout
 
