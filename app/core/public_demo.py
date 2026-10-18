@@ -13,9 +13,16 @@ from app.core.policy import PolicyGateway
 
 PUBLIC_SESSION_COOKIE = "bulkhead_session"
 PUBLIC_SESSION_TTL = timedelta(hours=2)
-PUBLIC_REQUEST_LIMIT = 60
+PUBLIC_SESSION_REQUEST_LIMIT = 120
+PUBLIC_IP_REQUEST_LIMIT = 300
 PUBLIC_REQUEST_WINDOW = 60.0
 PUBLIC_MAX_CONTENT_BYTES = 20 * 1024
+PUBLIC_RATE_LIMITED_PATHS = frozenset({
+    ("POST", "/api/evaluate"),
+    ("POST", "/api/lab/run"),
+    ("POST", "/api/demo"),
+    ("POST", "/api/reset-demo"),
+})
 
 
 @dataclass
@@ -123,23 +130,32 @@ class SessionStore:
 
 
 class RequestRateLimiter:
-    """Fixed-window limiter keyed independently by session and client IP."""
+    """Fixed-window limiter with independent session and IP budgets."""
 
-    def __init__(self, limit: int = PUBLIC_REQUEST_LIMIT, window: float = PUBLIC_REQUEST_WINDOW) -> None:
-        self.limit = limit
+    def __init__(
+        self,
+        session_limit: int = PUBLIC_SESSION_REQUEST_LIMIT,
+        ip_limit: int = PUBLIC_IP_REQUEST_LIMIT,
+        window: float = PUBLIC_REQUEST_WINDOW,
+    ) -> None:
+        self.session_limit = session_limit
+        self.ip_limit = ip_limit
         self.window = window
         self._hits: dict[str, tuple[float, int]] = {}
         self._lock = RLock()
 
-    def allow(self, *keys: str) -> bool:
+    def allow(self, session_key: str, ip_key: str) -> bool:
         now = monotonic()
         with self._lock:
-            for key in keys:
+            entries: list[tuple[str, float, int]] = []
+            for key, limit in ((session_key, self.session_limit), (ip_key, self.ip_limit)):
                 started, count = self._hits.get(key, (now, 0))
                 if now - started >= self.window:
                     started, count = now, 0
-                if count >= self.limit:
+                if count >= limit:
                     return False
+                entries.append((key, started, count))
+            for key, started, count in entries:
                 self._hits[key] = (started, count + 1)
             return True
 

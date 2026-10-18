@@ -11,7 +11,7 @@ const baseIntent = { goal: 'Read files', allowed_actions: ['read_file'], allowed
 const snapshot = (events = [], rules = [], incidents = [], captures = []) => ({ events, immunity_rules: rules, incidents, honeyworld_captures: captures, honeyworld: { captured_actions: [] } });
 const event = (id, decision = 'allow') => ({ id, decision, timestamp: new Date().toISOString(), action: { action_type: 'read_file', target: '/workspace/README.md' }, risk_score: 0, findings: [] });
 const ok = (data) => ({ ok: true, json: async () => data, text: async () => typeof data === 'string' ? data : JSON.stringify(data) });
-const fail = (message = 'Failed') => ({ ok: false, status: 500, json: async () => ({ detail: message }) });
+const fail = (message = 'Failed', status = 500) => ({ ok: false, status, json: async () => ({ detail: message }) });
 const deferred = () => { let resolve; const promise = new Promise((done) => { resolve = done; }); return { promise, resolve }; };
 const flush = async () => { for (let i = 0; i < 250; i++) await Promise.resolve(); };
 
@@ -88,6 +88,25 @@ test('Arena sends only AgentAction fields inside action', async () => {
   const replay = JSON.parse(arenaCalls[4].options.body);
   assert.equal(replay.action.target, '/workspace/.env');
   assert.equal(replay.action.content.includes('ignore previous instructions'), true);
+});
+
+test('three Arena plays complete with five successful evaluations each', async () => {
+  const a = boot(); await flush();
+  for (let play = 0; play < 3; play++) { a.elements['arena-watch'].fire('click'); await flush(); assert.equal(a.elements['arena-error'].hidden, true); assert.equal(a.elements['arena-finish'].hidden, false); }
+  assert.equal(a.calls.filter((call) => call.url === '/api/evaluate').length, 15);
+});
+
+test('Arena rate limits show the replay message and preserve earlier rows', async () => {
+  const a = boot(); await flush();
+  a.queue('/api/evaluate', { decision: 'allow', event: event('queued-1', 'allow') });
+  a.queue('/api/evaluate', { decision: 'quarantine', event: event('queued-2', 'quarantine') });
+  a.queue('/api/evaluate', fail('Public demo rate limit exceeded', 429));
+  a.elements['arena-watch'].fire('click'); await flush();
+  assert.equal(a.elements['arena-error'].textContent, 'Too many requests — wait a few seconds and press Replay');
+  assert.equal(a.elements['arena-error'].className.includes('rate-limit'), true);
+  assert.equal(a.elements['arena-with-steps'].children[0].textContent.includes('OK'), true);
+  assert.equal(a.elements['arena-with-steps'].children[1].textContent.includes('Caught'), true);
+  assert.equal(a.elements['arena-with-steps'].children[2].textContent.includes('Error'), false);
 });
 
 test('SSE reset clears immediately and ignores stale responses; healthy stream still polls at 3s', async () => {

@@ -4,7 +4,14 @@ from fastapi.testclient import TestClient
 
 from app.agents.lab_parser import parse_instruction_actions
 from app.core.models import ActionType
-from app.core.public_demo import global_lab_score, public_rate_limiter, sessions
+from app.core.public_demo import (
+    PUBLIC_IP_REQUEST_LIMIT,
+    PUBLIC_SESSION_REQUEST_LIMIT,
+    RequestRateLimiter,
+    global_lab_score,
+    public_rate_limiter,
+    sessions,
+)
 from app.main import app
 
 
@@ -38,7 +45,7 @@ def test_public_sessions_are_isolated_and_reset_is_local(monkeypatch) -> None:
     assert sessions.get(session_id) is not None
 
 
-def test_public_mode_rejects_oversized_body_and_rate_limits(monkeypatch) -> None:
+def test_public_mode_rejects_oversized_body_and_limits_only_mutating_demo_paths(monkeypatch) -> None:
     monkeypatch.setenv("BULKHEAD_PUBLIC_DEMO", "1")
     public_rate_limiter.clear()
     client = TestClient(app)
@@ -46,14 +53,45 @@ def test_public_mode_rejects_oversized_body_and_rate_limits(monkeypatch) -> None
     response = client.post("/api/lab/run", json={"page": "x" * 20_500})
     assert response.status_code == 413
 
-    original = public_rate_limiter.limit
-    public_rate_limiter.limit = 1
+    original_session = public_rate_limiter.session_limit
+    original_ip = public_rate_limiter.ip_limit
+    public_rate_limiter.session_limit = 1
+    public_rate_limiter.ip_limit = 100
     try:
         public_rate_limiter.clear()
         assert client.get("/api/session").status_code == 200
-        assert client.get("/api/session").status_code == 429
+        assert client.get("/api/state").status_code == 200
+        assert client.get("/api/events").status_code == 200
+        assert client.get("/healthz").status_code == 200
+        assert client.get("/static/index.html").status_code == 200
+        assert client.post("/api/evaluate", json={"action_type": "read_file", "target": "/workspace/README.md"}).status_code == 200
+        assert client.post("/api/evaluate", json={"action_type": "read_file", "target": "/workspace/README.md"}).status_code == 429
     finally:
-        public_rate_limiter.limit = original
+        public_rate_limiter.session_limit = original_session
+        public_rate_limiter.ip_limit = original_ip
+        public_rate_limiter.clear()
+
+
+def test_public_rate_limiter_has_independent_session_and_ip_budgets() -> None:
+    assert PUBLIC_SESSION_REQUEST_LIMIT == 120
+    assert PUBLIC_IP_REQUEST_LIMIT == 300
+    limiter = RequestRateLimiter(session_limit=2, ip_limit=1)
+    assert limiter.allow("session:a", "ip:a")
+    assert not limiter.allow("session:b", "ip:a")
+    assert limiter.allow("session:a", "ip:b")
+
+
+def test_public_arena_budget_allows_three_five_action_plays(monkeypatch) -> None:
+    monkeypatch.setenv("BULKHEAD_PUBLIC_DEMO", "1")
+    public_rate_limiter.clear()
+    client = TestClient(app)
+    try:
+        action = {"action_type": "read_file", "target": "/workspace/README.md"}
+        for _ in range(3):
+            assert client.post("/api/reset-demo").status_code == 200
+            for _ in range(5):
+                assert client.post("/api/evaluate", json=action).status_code == 200
+    finally:
         public_rate_limiter.clear()
 
 

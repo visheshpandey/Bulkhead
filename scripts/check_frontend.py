@@ -37,82 +37,38 @@ def check_layout(page) -> None:
                for field in dimensions["fields"]), dimensions
 
 
-def exercise(page, output: Path) -> None:
-    expect(page.locator("#intent-goal")).not_to_have_value("")
+def exercise(page, output: Path, arena_statuses: list[int]) -> None:
     expect(page.locator("#connection-label")).to_have_text("Connected")
     assert page.locator("html").get_attribute("data-theme") == "light"
-    page.locator("#run-demo-button").click()
-    decisions = ["allow", "quarantine", "block", "block"]
-    for index, decision in enumerate(decisions, 1):
-        if index > 1:
-            page.locator("#demo-next").click()
-        expect(page.locator("#demo-step")).to_contain_text(f"Step {index} of 4")
-        expect(page.locator("#flow-diagram")).to_have_attribute("data-decision", decision)
-        expect(page.locator("#log-body tr")).to_have_count(index)
-    page.locator("#demo-exit").click()
+    page.locator("#arena-speed").select_option("2")
+    for _ in range(3):
+        before = len(arena_statuses)
+        page.locator("#arena-watch").click()
+        expect(page.locator("#arena-finish")).to_be_hidden()
+        expect(page.locator("#arena-finish")).to_be_visible(timeout=30000)
+        assert arena_statuses[before:before + 5] == [200] * 5
+        expect(page.locator("#arena-with-steps .arena-step")).to_have_count(4)
+        expect(page.locator("#arena-replay-result")).to_be_visible()
 
-    page.locator("#log-body tr").first.focus()
-    page.keyboard.press("ArrowDown")
-    assert page.locator("#log-body tr").nth(1).evaluate("el => el === document.activeElement")
-    page.keyboard.press("Enter")
-    expect(page.locator("#event-drawer")).to_be_visible()
-    expect(page.locator("#event-drawer")).to_have_attribute("aria-hidden", "false")
-    expect(page.locator("#drawer-body")).to_contain_text("Fingerprint")
-    page.screenshot(path=str(output / "details-1440.png"))
-    page.keyboard.press("Escape")
-
-    page.locator('[data-page="test"]').click()
-    page.locator("#run-all-scenarios").click()
-    expect(page.locator("#batch-summary")).to_have_text("15 of 15 matched expected result.", timeout=20000)
-    expect(page.locator("#scenario-results-body tr")).to_have_count(15)
-    # Running the suite again must not fail on learned fingerprints.
-    page.locator("#run-all-scenarios").click()
-    expect(page.locator("#run-all-scenarios")).to_be_enabled(timeout=20000)
-    expect(page.locator("#batch-summary")).to_have_text("15 of 15 matched expected result.")
-
-    page.locator('[data-page="rules"]').click()
-    checkbox = page.locator("#rules-list input").first
-    checkbox.uncheck()
-    expect(page.locator("#rules-list input").first).not_to_be_checked()
-    expect(page.locator("#rules-list input").first).to_be_enabled()
-    page.locator("#rules-list input").first.check()
-    expect(page.locator("#rules-list input").first).to_be_checked()
-    count = page.locator("#rules-list tr").count()
-    page.once("dialog", lambda dialog: dialog.accept())
-    page.locator("#rules-list tr").first.locator('button[aria-label^="Delete rule"]').click()
-    expect(page.locator("#rules-list tr")).to_have_count(count - 1)
-
-    page.locator('[data-page="exports"]').click()
-    for button in ("export-audit", "export-csv", "export-rules", "export-incidents"):
-        with page.expect_download() as download:
-            page.locator(f"#{button}").click()
-        assert download.value.failure() is None
-    page.locator("#report-select").select_option(index=1)
-    expect(page.locator("#incident-preview")).to_contain_text("# Bulkhead Incident")
-    with page.expect_download():
-        page.locator("#download-report").click()
+    page.locator('[data-page="lab"]').click()
+    page.locator('[data-sample="comment"]').click()
+    page.locator("#lab-run").click()
+    expect(page.locator("#lab-status")).to_contain_text("Bulkhead", timeout=10000)
 
     for width in (1440, 1024, 375):
         page.set_viewport_size({"width": width, "height": 1000 if width > 400 else 812})
-        for name in ("activity", "test", "rules", "exports"):
-            page.locator(f'[data-page="{name}"]').click()
+        for name in ("arena", "lab", "integrate"):
+            page.evaluate("name => { location.hash = '#' + name; }", name)
+            expect(page.locator(f"#page-{name}")).to_be_visible()
             check_layout(page)
             page.screenshot(path=str(output / f"{name}-{width}.png"), full_page=True)
-        page.locator('[data-page="activity"]').click()
+        page.evaluate("location.hash = '#arena'")
+        expect(page.locator("#page-arena")).to_be_visible()
         page.locator("#theme-toggle").click()
         expect(page.locator("html")).to_have_attribute("data-theme", "dark")
         check_layout(page)
-        page.screenshot(path=str(output / f"activity-dark-{width}.png"), full_page=True)
+        page.screenshot(path=str(output / f"arena-dark-{width}.png"), full_page=True)
         page.locator("#theme-toggle").click()
-
-    # A second client resets while this dashboard has an open drawer.
-    page.locator("#log-body tr").first.click()
-    expect(page.locator("#event-drawer")).to_be_visible()
-    assert page.request.post("/api/reset-demo").ok
-    expect(page.locator("#log-body tr")).to_have_count(0)
-    expect(page.locator("#event-drawer")).not_to_be_visible()
-    expect(page.locator("#latest-decision")).to_have_text("No decision yet")
-    expect(page.locator("#rule-count")).to_have_text("0 rules")
 
 
 def main() -> None:
@@ -136,13 +92,15 @@ def main() -> None:
                                           viewport={"width": 1440, "height": 1000})
             page = context.new_page()
             errors: list[str] = []
+            arena_statuses: list[int] = []
             page.on("pageerror", lambda error: errors.append(str(error)))
             page.on("console", lambda message: errors.append(message.text) if message.type == "error" else None)
+            page.on("response", lambda response: arena_statuses.append(response.status) if "/api/evaluate" in response.url else None)
             page.goto("/", wait_until="domcontentloaded")
-            exercise(page, output)
+            exercise(page, output, arena_statuses)
             assert not errors, errors
             browser.close()
-        print("Browser checks passed: 15/15 scenarios twice, four demo steps, rules, exports, reset.")
+        print("Browser checks passed: three Arena plays with five 200 responses each, lab, and responsive pages.")
         print("No console errors or page overflow at 1440, 1024, or 375px. Screenshots: artifacts/frontend/")
     finally:
         server.should_exit = True

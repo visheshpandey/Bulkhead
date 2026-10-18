@@ -378,7 +378,7 @@ def evaluate(
 ) -> Any:
     assert request.action is not None
     agent_id = _validated_agent_id(x_agent_id if x_agent_id is not None else request.action.agent_id)
-    if not rate_limiter.allow(agent_id):
+    if not public_demo_enabled() and not rate_limiter.allow(agent_id):
         raise HTTPException(status_code=429, detail="Agent evaluation rate limit exceeded (120/minute)")
     # model_copy(update=...) intentionally skips validation in Pydantic. Build
     # a fresh model so a malformed identity header cannot enter the ledger.

@@ -288,6 +288,7 @@ pre { max-width: 100%; overflow: auto; white-space: pre-wrap; overflow-wrap: any
 .arena-finish strong { font-size: 20px; }
 .arena-finish-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .arena-error { margin: 14px 0 0; color: var(--block); font-size: 20px; font-weight: 650; }
+.arena-error.rate-limit { color: var(--quarantine); }
 .replay-result { margin: 10px 0 0; text-align: left; }
 .arena-controls { display: flex; align-items: center; gap: 10px; margin-top: 14px; }
 .speed-control { display: inline-flex; align-items: center; gap: 6px; color: var(--text-2); }

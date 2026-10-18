@@ -11,6 +11,7 @@ from app.api.routes import router
 from app.core.config import public_demo_enabled
 from app.core.public_demo import (
     PUBLIC_MAX_CONTENT_BYTES,
+    PUBLIC_RATE_LIMITED_PATHS,
     PUBLIC_SESSION_COOKIE,
     public_rate_limiter,
     sessions,
@@ -74,7 +75,7 @@ async def public_security_middleware(request: Request, call_next):
         set_session_cookie = cookie_id != session_id
         request.state.session_id = session_id
 
-        if request.url.path not in {"/health", "/healthz", "/api/health"} and not request.url.path.startswith("/static"):
+        if (request.method, request.url.path) in PUBLIC_RATE_LIMITED_PATHS:
             client_ip = request.client.host if request.client else "unknown"
             if not public_rate_limiter.allow(f"session:{session_id}", f"ip:{client_ip}"):
                 response = JSONResponse({"detail": "Public demo rate limit exceeded"}, status_code=429)

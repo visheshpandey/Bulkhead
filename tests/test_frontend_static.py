@@ -81,7 +81,8 @@ def test_frontend_does_not_inject_server_html_or_run_legacy_demo() -> None:
     assert 'request("/api/demo"' not in script
     assert 'request("/api/default-intent"' in script
     assert 'addEventListener("audit_event"' in script
-    assert 'window.setInterval(() => sync({ silent: true }), 3000)' in script
+    assert 'window.setInterval(() => { if (!arenaPlaying) sync({ silent: true }); }, 3000)' in script
+    assert 'Too many requests — wait a few seconds and press Replay' in script
 
 
 def test_frontend_branding_and_download_metadata_use_bulkhead() -> None:
