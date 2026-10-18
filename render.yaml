@@ -1,0 +1,9 @@
+services:
+  - type: web
+    name: bulkhead-demo
+    runtime: docker
+    plan: free
+    healthCheckPath: /healthz
+    envVars:
+      - key: BULKHEAD_PUBLIC_DEMO
+        value: "1"

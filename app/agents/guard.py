@@ -1,5 +1,5 @@
-"""Compatibility import path for Bulkhead tool guards."""
+"""Import path for Bulkhead tool guards."""
 
-from .client import airlock_guard, bulkhead_guard, guard, guard_tool
+from .client import bulkhead_guard, guard, guard_tool
 
-__all__ = ["airlock_guard", "bulkhead_guard", "guard", "guard_tool"]
+__all__ = ["bulkhead_guard", "guard", "guard_tool"]

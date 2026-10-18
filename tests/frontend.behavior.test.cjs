@@ -6,7 +6,7 @@ const vm = require('node:vm');
 
 const script = fs.readFileSync(path.join(__dirname, '../app/static/app.js'), 'utf8');
 const scenarios = JSON.parse(fs.readFileSync(path.join(__dirname, '../app/static/scenarios.json'), 'utf8'));
-const names = 'run-demo-button reset-button theme-toggle connection-label request-rate refresh-button demo-bar demo-step demo-next demo-exit summary-line summary-detail event-count decision-filter action-filter search-filter log-body activity-empty empty-demo-button latest-decision latest-risk latest-reason latest-target latest-action finding-list flow-diagram honey-summary capture-list containment-comparison without-action with-action scenario-list run-all-scenarios batch-summary scenario-results scenario-results-body action-form intent-goal allowed-paths denied-paths allow-network default-intent intent-status intent-goal-error action-type action-target action-target-error action-content action-payload action-payload-error evaluate-button action-status safe-fixture malicious-fixture test-result-summary test-result-reason test-result-findings test-result-output rule-count rules-list rules-empty export-audit export-csv export-rules export-incidents export-status report-select incident-preview download-report event-drawer drawer-title drawer-body drawer-close copy-event-json drawer-close-secondary drawer-backdrop toast page-activity page-test page-rules page-exports'.split(' ');
+const names = 'run-demo-button reset-button theme-toggle connection-label request-rate refresh-button demo-bar demo-step demo-next demo-exit summary-line summary-detail event-count decision-filter action-filter search-filter log-body activity-empty empty-demo-button latest-decision latest-risk latest-reason latest-target latest-action finding-list flow-diagram honey-summary capture-list containment-comparison without-action with-action scenario-list run-all-scenarios batch-summary scenario-results scenario-results-body action-form intent-goal allowed-paths denied-paths allow-network default-intent intent-status intent-goal-error action-type action-target action-target-error action-content action-payload action-payload-error evaluate-button action-status safe-fixture malicious-fixture test-result-summary test-result-reason test-result-findings test-result-output rule-count rules-list rules-empty export-audit export-csv export-rules export-incidents export-status report-select incident-preview download-report event-drawer drawer-title drawer-body drawer-close copy-event-json drawer-close-secondary drawer-backdrop toast page-activity page-test page-rules page-exports arena-watch arena-without-steps arena-with-steps arena-finish arena-error arena-replay-result with-result without-result arena-replay arena-step arena-speed arena-try arena-integrate technical-toggle'.split(' ');
 const baseIntent = { goal: 'Read files', allowed_actions: ['read_file'], allowed_targets: ['/workspace/'], denied_targets: [], allow_network: false };
 const snapshot = (events = [], rules = [], incidents = [], captures = []) => ({ events, immunity_rules: rules, incidents, honeyworld_captures: captures, honeyworld: { captured_actions: [] } });
 const event = (id, decision = 'allow') => ({ id, decision, timestamp: new Date().toISOString(), action: { action_type: 'read_file', target: '/workspace/README.md' }, risk_score: 0, findings: [] });
@@ -46,7 +46,7 @@ function boot({ initial = snapshot(), intent = baseIntent, intentPending = null,
   let count = 0;
   const fetch = (url, options = {}) => { calls.push({ url, options }); const queue = queues.get(url); if (queue?.length) { const value = queue.shift(); return value?.promise || Promise.resolve(value?.ok === false ? value : ok(value)); } if (url === '/api/state') return Promise.resolve(ok(initial)); if (url === '/api/default-intent') return intentPending?.promise || Promise.resolve(ok(intent)); if (url === '/static/scenarios.json') return Promise.resolve(ok(scenarios)); if (url === '/api/evaluate') { const action = JSON.parse(options.body).action; const decision = action.target.includes('README') ? 'allow' : action.content?.includes('1gn0re') ? 'block' : action.target.includes('.env') ? 'quarantine' : 'block'; return Promise.resolve(ok({ decision, risk_score: 80, reason: 'Gateway decision', event: { ...event(`e${++count}`, decision), action } })); } return Promise.resolve(ok({})); };
   class EventSource { constructor() { this.listeners = {}; EventSource.instance = this; } addEventListener(name, listener) { this.listeners[name] = listener; } emit(name, value) { this.listeners[name]({ data: JSON.stringify(value) }); } close() {} }
-  const window = { setInterval: (fn, ms) => { intervals.push({ fn, ms }); return intervals.length; }, setTimeout: () => 1, clearTimeout() {}, addEventListener() {}, confirm: () => confirm };
+  const window = { setInterval: (fn, ms) => { intervals.push({ fn, ms }); return intervals.length; }, setTimeout: () => 1, clearTimeout() {}, addEventListener() {}, matchMedia: () => ({ matches: true }), innerHeight: 800, innerWidth: 1280, confirm: () => confirm };
   const location = { hash: '' };
   const localStorage = { getItem: () => { if (storageError) throw Error('denied'); return null; }, setItem: () => { if (storageError) throw Error('denied'); } };
   vm.runInNewContext(script, { document, window, location, localStorage, navigator: { clipboard: { writeText: async () => {} } }, URL: { createObjectURL: () => 'blob:test', revokeObjectURL() {} }, Blob, fetch, EventSource, console });
@@ -74,6 +74,20 @@ test('navigation, filtering, keyboard rows and safe event details', async () => 
   a.fireKey({ key: 'Escape' }); assert.equal(a.elements['event-drawer'].hidden, true);
   assert.equal(a.elements['event-drawer'].attributes['aria-hidden'], 'true');
   assert.equal(a.document.shell.inert, false);
+});
+
+test('Arena sends only AgentAction fields inside action', async () => {
+  const a = boot(); await flush();
+  a.elements['arena-watch'].fire('click'); await flush();
+  const arenaCalls = a.calls.filter((call) => call.url === '/api/evaluate');
+  assert.equal(arenaCalls.length, 5);
+  const payload = JSON.parse(arenaCalls[0].options.body);
+  assert.deepEqual(Object.keys(payload.action).sort(), ['action_type', 'content', 'payload', 'target']);
+  assert.equal(Object.hasOwn(payload.action, 'intent'), false);
+  assert.equal(payload.intent.goal, 'Summarise https://docs.example/setup');
+  const replay = JSON.parse(arenaCalls[4].options.body);
+  assert.equal(replay.action.target, '/workspace/.env');
+  assert.equal(replay.action.content.includes('ignore previous instructions'), true);
 });
 
 test('SSE reset clears immediately and ignores stale responses; healthy stream still polls at 3s', async () => {

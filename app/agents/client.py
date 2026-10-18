@@ -136,14 +136,8 @@ def bulkhead_guard(
 def guard_tool(
     client: BulkheadClient, action_type: ActionType | str, *, target: str = ""
 ) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
-    """Compatibility helper for the common fixed-target tool case."""
-    return guard(client, action_type=action_type, target=target)
+    """Convenience helper for the common fixed-target tool case."""
+    return bulkhead_guard(client, action_type=action_type, target=target)
 
 
-# Deprecated compatibility aliases. New integrations should use the Bulkhead
-# names above, while existing legacy integrations continue to share the same
-# implementation and wire behavior.
-AirlockBlocked = BulkheadBlocked
-AirlockClient = BulkheadClient
-airlock_guard = bulkhead_guard
 guard = bulkhead_guard

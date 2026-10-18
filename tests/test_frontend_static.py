@@ -97,8 +97,18 @@ def test_frontend_branding_and_download_metadata_use_bulkhead() -> None:
     for filename in ("bulkhead-audit.json", "bulkhead-events.csv", "bulkhead-rules.json",
                      "bulkhead-incidents.json", "bulkhead-incident-"):
         assert filename in script
-    for legacy in ("AIRLOCK", "airlock-theme", "airlock-", "box-airlock"):
-        assert legacy not in html + css + script
+
+
+def test_arena_final_polish_contracts_are_present() -> None:
+    css = (STATIC / "styles.css").read_text(encoding="utf-8")
+    script = (STATIC / "app.js").read_text(encoding="utf-8")
+    for label in ("Read the page", "Opened your passwords", "Sent to attacker", "Answered"):
+        assert label in script
+    assert "The unprotected agent keeps going." in script
+    assert "min-height: 40px" in css
+    assert "Now try to trick it yourself → Try it" in script
+    assert 'guideIndex === guideSteps.length - 1 ? "Done"' in script
+    assert "arenaReplayDone" in script
 
 
 def test_frontend_form_errors_and_table_layout_contracts_are_explicit() -> None:

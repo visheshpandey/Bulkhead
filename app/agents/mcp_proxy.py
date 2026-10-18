@@ -68,6 +68,5 @@ class MCPProxy:
 
 MCPToolProxy = MCPProxy
 BulkheadMCPProxy = MCPProxy
-AirlockMCPProxy = MCPProxy
 
-__all__ = ["AirlockMCPProxy", "BulkheadMCPProxy", "MCPProxy", "MCPToolProxy"]
+__all__ = ["BulkheadMCPProxy", "MCPProxy", "MCPToolProxy"]

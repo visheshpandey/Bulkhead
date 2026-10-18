@@ -1,11 +1,11 @@
-from app.agents.gateway_client import AirlockGatewayClient, BulkheadGatewayClient, GatewayClient
+from app.agents.gateway_client import BulkheadGatewayClient, GatewayClient
 from app.agents.mcp_proxy import MCPProxy
-from app.core.models import Decision
+from app.agents.mcp_server import BulkheadMCPServer
+from app.core.models import ActionType, AgentAction, Decision
 
 
-def test_gateway_client_compatibility_names_share_implementation() -> None:
+def test_gateway_client_names_share_implementation() -> None:
     assert GatewayClient is BulkheadGatewayClient
-    assert AirlockGatewayClient is BulkheadGatewayClient
 
 
 class _StubClient:
@@ -38,3 +38,26 @@ def test_mcp_proxy_does_not_invoke_blocked_call() -> None:
     else:
         raise AssertionError("blocked MCP call was invoked")
     assert invoked == []
+
+
+def test_mcp_server_evaluates_tool_call_without_invoking_tools() -> None:
+    evaluated: list[AgentAction] = []
+
+    def evaluate(action: AgentAction):
+        evaluated.append(action)
+        return type(
+            "Result",
+            (),
+            {"decision": Decision.ALLOW, "allowed": True, "reason": "safe", "event": type("Event", (), {"id": "evt-1"})()},
+        )()
+
+    response = BulkheadMCPServer(evaluate).handle(
+        {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "tools/call",
+            "params": {"arguments": {"action_type": ActionType.READ_FILE, "target": "/workspace/README.md"}},
+        }
+    )
+    assert evaluated[0].target == "/workspace/README.md"
+    assert response["result"]["isError"] is False

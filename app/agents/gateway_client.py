@@ -7,11 +7,8 @@ API-key, identity, and decision handling.
 """
 
 from .client import (
-    AirlockBlocked,
-    AirlockClient,
     BulkheadBlocked,
     BulkheadClient,
-    airlock_guard,
     bulkhead_guard,
     guard,
     guard_tool,
@@ -19,17 +16,12 @@ from .client import (
 
 GatewayClient = BulkheadClient
 BulkheadGatewayClient = BulkheadClient
-AirlockGatewayClient = BulkheadClient
 
 __all__ = [
-    "AirlockBlocked",
-    "AirlockClient",
-    "AirlockGatewayClient",
     "BulkheadBlocked",
     "BulkheadClient",
     "BulkheadGatewayClient",
     "GatewayClient",
-    "airlock_guard",
     "bulkhead_guard",
     "guard",
     "guard_tool",

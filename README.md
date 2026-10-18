@@ -2,8 +2,6 @@
 
 ## A self-defending gateway for AI-agent actions
 
-> Formerly AIRLOCK.
-
 Bulkhead is a local, zero-trust gateway that evaluates an agent's proposed tool
 call before the tool is invoked. It compares the action with user intent,
 detects prompt injection and sensitive-data handling, quarantines suspicious
@@ -56,11 +54,9 @@ package installation is required.
 
 The project configuration surface documents the following variables. The
 values in `.env.example` are safe local defaults; `.env` is ignored and must
-never contain real credentials. The running gateway currently consumes
-the `BULKHEAD_*` variables; the host/port values are passed by the run
-commands and `BULKHEAD_LLM_JUDGE` reserves the optional judge integration flag.
-Legacy environment variables remain accepted as a fallback for existing
-deployments.
+never contain real credentials. The running gateway currently consumes the
+`BULKHEAD_*` variables; the host/port values are passed by the run commands and
+`BULKHEAD_LLM_JUDGE` reserves the optional judge integration flag.
 
 | Variable | Example | Purpose |
 | --- | --- | --- |
@@ -70,6 +66,7 @@ deployments.
 | `BULKHEAD_DB_PATH` | `./data/bulkhead.db` | SQLite file for events, incidents, immunity rules, and capture receipts. Use `:memory:` for an ephemeral process. |
 | `BULKHEAD_API_KEY` | *(blank)* | Optional API key. When set, evaluation requests require `X-Bulkhead-Key`, `X-API-Key`, or `Authorization: Bearer ...`. |
 | `BULKHEAD_LLM_JUDGE` | `0` | Enables the optional `{risk, rationale}` second check for borderline risk scores (30–69); deterministic policy remains authoritative. |
+| `BULKHEAD_PUBLIC_DEMO` | `0` | Enables isolated two-hour visitor sessions, public request limits, and the Arena/Attack lab sandbox. |
 
 The default database path is relative to the working directory. SQLite creates
 the parent directory, enables WAL mode for file databases, and reloads the
@@ -98,6 +95,20 @@ The image is based on Python 3.11.9, installs `requirements.lock`, creates
 `/app/data`, and runs as the unprivileged `bulkhead` user. The named volume is
 optional but preserves the SQLite ledger between container restarts. Runtime
 data is ignored by Git.
+
+## Deploy a public demo
+
+The repository includes `render.yaml` for a one-click Render web service. Create
+a new Blueprint from the repository and deploy the `bulkhead-demo` service. The
+service listens on Render's `PORT`, uses `/healthz` for health checks, and sets
+`BULKHEAD_PUBLIC_DEMO=1`.
+
+Public mode gives each visitor an expiring, httpOnly session cookie. Events,
+incidents, immunity rules, HoneyWorld receipts, lab scores, and reset operations
+stay inside that visitor's in-memory sandbox. Requests are limited to 60 per
+minute per session and per IP, and request bodies are limited to 20 KB. The
+demo only evaluates descriptive actions; it never reads real files, runs shell
+commands, or makes outbound network calls.
 
 ## API quick reference
 

@@ -63,3 +63,16 @@ class ExportResponse(BaseModel):
     incidents: list[dict[str, Any]] = Field(default_factory=list)
     immunity_rules: list[dict[str, Any]] = Field(default_factory=list)
     honeyworld_captures: list[dict[str, Any]] = Field(default_factory=list)
+
+
+class LabRunRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    page: str = Field(min_length=1, max_length=20_000)
+
+
+class LabReportRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    page: str = Field(min_length=1, max_length=20_000)
+    reason: str = Field(default="User reported a possible bypass", max_length=1_000)
