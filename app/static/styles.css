@@ -108,6 +108,10 @@ main { padding: 24px 0 52px; }
 .data-table th { padding: 8px; border-bottom: 1px solid var(--line); color: var(--text-2); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: .025em; white-space: nowrap; }
 .data-table td { padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-align: middle; overflow-wrap: anywhere; }
 .log-table th { position: sticky; top: 0; z-index: 1; background: var(--panel); }
+.log-table th:nth-child(2), .log-table td:nth-child(2) { width: 112px; white-space: nowrap; }
+.log-table th:nth-child(3), .log-table td:nth-child(3) { width: 132px; white-space: nowrap; }
+.log-table th:nth-child(5), .log-table td:nth-child(5) { width: 68px; white-space: nowrap; }
+.log-table th:nth-child(6), .log-table td:nth-child(6) { width: 178px; white-space: nowrap; }
 .data-table tbody tr { height: 36px; }
 .data-table tr:last-child td { border-bottom: 0; }
 .data-table tbody tr[data-event-id], .data-table tbody tr[tabindex], .data-table tbody tr.clickable { cursor: pointer; }
@@ -145,7 +149,7 @@ main { padding: 24px 0 52px; }
 .flow-diagram[data-decision="block"] .route-in { stroke: var(--block); stroke-width: 2; }
 .flow-diagram[data-decision="quarantine"] .route-in, .flow-diagram[data-decision="quarantine"] .route-honey { stroke: var(--quarantine); stroke-width: 2; }
 .flow-diagram[data-decision="allow"] .box-tools { stroke: var(--allow); }
-.flow-diagram[data-decision="block"] .box-airlock { stroke: var(--block); }
+.flow-diagram[data-decision="block"] .box-bulkhead { stroke: var(--block); }
 .flow-diagram[data-decision="quarantine"] .box-honey { stroke: var(--quarantine); }
 .routing-panel > .meta { margin-bottom: 10px; }
 .disclosure { border-top: 1px solid var(--line); padding: 9px 0; }
@@ -188,6 +192,7 @@ pre { max-width: 100%; overflow: auto; white-space: pre-wrap; overflow-wrap: any
 #test-result-output:not(:empty), #incident-preview { margin: 12px 0 0; padding: 12px; border: 1px solid var(--line); border-radius: 4px; background: var(--bg); }
 
 .rules-table { min-width: 750px; }
+.rules-table th:first-child, .rules-table td:first-child { width: 190px; white-space: nowrap; }
 .rules-table button { border: 0; border-radius: 4px; background: transparent; color: var(--accent); }
 .rules-table button:hover { text-decoration: underline; }
 .export-panel { margin-bottom: 16px; }

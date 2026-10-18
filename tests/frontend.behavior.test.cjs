@@ -6,7 +6,7 @@ const vm = require('node:vm');
 
 const script = fs.readFileSync(path.join(__dirname, '../app/static/app.js'), 'utf8');
 const scenarios = JSON.parse(fs.readFileSync(path.join(__dirname, '../app/static/scenarios.json'), 'utf8'));
-const names = 'run-demo-button reset-button theme-toggle connection-label request-rate refresh-button demo-bar demo-step demo-next demo-exit summary-line summary-detail event-count decision-filter action-filter search-filter log-body activity-empty empty-demo-button latest-decision latest-risk latest-reason latest-target latest-action finding-list flow-diagram honey-summary capture-list containment-comparison without-action with-action scenario-list run-all-scenarios batch-summary scenario-results scenario-results-body action-form intent-goal allowed-paths denied-paths allow-network default-intent intent-status intent-goal-error action-type action-target action-target-error action-content action-payload evaluate-button action-status safe-fixture malicious-fixture test-result-summary test-result-reason test-result-findings test-result-output rule-count rules-list rules-empty export-audit export-csv export-rules export-incidents export-status report-select incident-preview download-report event-drawer drawer-title drawer-body drawer-close copy-event-json drawer-close-secondary drawer-backdrop toast page-activity page-test page-rules page-exports'.split(' ');
+const names = 'run-demo-button reset-button theme-toggle connection-label request-rate refresh-button demo-bar demo-step demo-next demo-exit summary-line summary-detail event-count decision-filter action-filter search-filter log-body activity-empty empty-demo-button latest-decision latest-risk latest-reason latest-target latest-action finding-list flow-diagram honey-summary capture-list containment-comparison without-action with-action scenario-list run-all-scenarios batch-summary scenario-results scenario-results-body action-form intent-goal allowed-paths denied-paths allow-network default-intent intent-status intent-goal-error action-type action-target action-target-error action-content action-payload action-payload-error evaluate-button action-status safe-fixture malicious-fixture test-result-summary test-result-reason test-result-findings test-result-output rule-count rules-list rules-empty export-audit export-csv export-rules export-incidents export-status report-select incident-preview download-report event-drawer drawer-title drawer-body drawer-close copy-event-json drawer-close-secondary drawer-backdrop toast page-activity page-test page-rules page-exports'.split(' ');
 const baseIntent = { goal: 'Read files', allowed_actions: ['read_file'], allowed_targets: ['/workspace/'], denied_targets: [], allow_network: false };
 const snapshot = (events = [], rules = [], incidents = [], captures = []) => ({ events, immunity_rules: rules, incidents, honeyworld_captures: captures, honeyworld: { captured_actions: [] } });
 const event = (id, decision = 'allow') => ({ id, decision, timestamp: new Date().toISOString(), action: { action_type: 'read_file', target: '/workspace/README.md' }, risk_score: 0, findings: [] });
@@ -156,11 +156,15 @@ test('guided demo resets then evaluates exactly four steps without legacy demo e
   assert.equal(a.elements['demo-step'].textContent.includes('Step 1 of 4'), true);
   for (let step = 2; step <= 4; step++) { a.elements['demo-next'].fire('click'); await flush(); assert.equal(a.elements['demo-step'].textContent.includes(`Step ${step} of 4`), true); }
   assert.equal(a.calls.filter((call) => call.url === '/api/evaluate').length, 4);
+  assert.equal(a.elements['demo-step'].textContent.includes('Blocked'), true);
   assert.equal(a.calls.some((call) => call.url === '/api/demo'), false);
   const actions = a.calls.filter((call) => call.url === '/api/evaluate').map((call) => JSON.parse(call.options.body).action);
   assert.equal(actions[1].content, actions[2].content); assert.notEqual(actions[2].content, actions[3].content);
   assert.equal(a.elements['page-activity'].hidden, false);
   assert.equal(a.elements['demo-step'].textContent.includes('Gateway decision'), false);
+  assert.equal(a.elements['demo-next'].textContent, 'Done');
+  assert.equal(a.elements['demo-bar'].hidden, false);
+  a.elements['demo-next'].fire('click'); assert.equal(a.elements['demo-bar'].hidden, true);
   a.elements['demo-exit'].fire('click'); assert.equal(a.elements['demo-bar'].hidden, true);
 });
 
@@ -252,11 +256,30 @@ test('manual evaluation cannot overlap and validation details are readable', asy
   assert.equal(a.elements.toast.textContent, 'action.target: Target is required');
 });
 
+test('empty target shows the exact inline validation and keeps Evaluate disabled', async () => {
+  const a = boot(); await flush(); a.links[1].fire('click');
+  a.elements['action-target'].value = ''; a.elements['action-target'].fire('input');
+  assert.equal(a.elements['evaluate-button'].disabled, true);
+  a.elements['action-form'].fire('submit'); await flush();
+  assert.equal(a.elements['action-target-error'].textContent, 'Enter a target path, command or URL.');
+  assert.equal(a.elements['action-target'].attributes['aria-invalid'], 'true');
+  assert.equal(a.calls.filter((call) => call.url === '/api/evaluate').length, 0);
+});
+
+test('invalid payload shows exact inline validation and does not submit', async () => {
+  const a = boot(); await flush(); a.links[1].fire('click');
+  a.elements['action-payload'].value = '{invalid';
+  a.elements['action-form'].fire('submit'); await flush();
+  assert.equal(a.elements['action-payload-error'].textContent, 'Payload must be valid JSON.');
+  assert.equal(a.elements['action-payload'].attributes['aria-invalid'], 'true');
+  assert.equal(a.calls.filter((call) => call.url === '/api/evaluate').length, 0);
+});
+
 test('four exports and incident report preview/download use API bytes', async () => {
   const a = boot({ initial: snapshot([], [], [{ id: 'I-1' }]) }); await flush();
   for (const id of ['export-audit', 'export-csv', 'export-rules', 'export-incidents']) a.elements[id].fire('click'); await flush();
   for (const url of ['/api/export?format=json', '/api/export?format=csv', '/api/rules', '/api/incidents']) assert.equal(a.calls.some((call) => call.url === url), true);
   a.queue('/api/incidents/I-1/report', '# Real report'); a.elements['report-select'].value = 'I-1'; a.elements['report-select'].fire('change'); await flush();
   assert.equal(a.elements['incident-preview'].textContent, '# Real report');
-  a.elements['download-report'].fire('click'); assert.equal(a.downloads.some((name) => name === 'airlock-incident-I-1.md'), true);
+  a.elements['download-report'].fire('click'); assert.equal(a.downloads.some((name) => name === 'bulkhead-incident-I-1.md'), true);
 });

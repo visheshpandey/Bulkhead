@@ -69,6 +69,12 @@ def test_guided_demo_decisions_against_real_gateway() -> None:
     assert decisions == ["allow", "quarantine", "block", "block"]
 
 
+def test_force_push_fixture_uses_github_action_push_target() -> None:
+    fixtures = json.loads((STATIC / "scenarios.json").read_text(encoding="utf-8"))
+    force_push = next(fixture for fixture in fixtures if fixture["id"] == "git-force")
+    assert force_push["action"] == {"action_type": "github_action", "target": "push --force main"}
+
+
 def test_frontend_does_not_inject_server_html_or_run_legacy_demo() -> None:
     script = (STATIC / "app.js").read_text(encoding="utf-8")
     assert "innerHTML" not in script
@@ -76,6 +82,39 @@ def test_frontend_does_not_inject_server_html_or_run_legacy_demo() -> None:
     assert 'request("/api/default-intent"' in script
     assert 'addEventListener("audit_event"' in script
     assert 'window.setInterval(() => sync({ silent: true }), 3000)' in script
+
+
+def test_frontend_branding_and_download_metadata_use_bulkhead() -> None:
+    html = (STATIC / "index.html").read_text(encoding="utf-8")
+    css = (STATIC / "styles.css").read_text(encoding="utf-8")
+    script = (STATIC / "app.js").read_text(encoding="utf-8")
+    assert "Bulkhead — Agent policy gateway" in html
+    assert "Without Bulkhead" in html
+    assert 'class="box-bulkhead"' in html
+    assert ".box-bulkhead" in css
+    assert 'localStorage.setItem("bulkhead-theme"' in script
+    assert 'localStorage.getItem("bulkhead-theme"' in script
+    for filename in ("bulkhead-audit.json", "bulkhead-events.csv", "bulkhead-rules.json",
+                     "bulkhead-incidents.json", "bulkhead-incident-"):
+        assert filename in script
+    for legacy in ("AIRLOCK", "airlock-theme", "airlock-", "box-airlock"):
+        assert legacy not in html + css + script
+
+
+def test_frontend_form_errors_and_table_layout_contracts_are_explicit() -> None:
+    html = (STATIC / "index.html").read_text(encoding="utf-8")
+    css = (STATIC / "styles.css").read_text(encoding="utf-8")
+    script = (STATIC / "app.js").read_text(encoding="utf-8")
+    assert "Enter a target path, command or URL." in script
+    assert "Payload must be valid JSON." in script
+    assert 'id="action-payload-error"' in html
+    assert 'aria-describedby="action-payload-error"' in html
+    assert 'aria-invalid="false"' in html
+    assert ".log-table th:nth-child(2), .log-table td:nth-child(2)" in css
+    assert ".log-table th:nth-child(3), .log-table td:nth-child(3)" in css
+    assert ".log-table th:nth-child(5), .log-table td:nth-child(5)" in css
+    assert ".log-table th:nth-child(6), .log-table td:nth-child(6)" in css
+    assert ".rules-table th:first-child, .rules-table td:first-child" in css
 
 
 def test_script_controls_exist_in_dashboard_markup() -> None:

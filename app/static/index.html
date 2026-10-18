@@ -4,9 +4,9 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="theme-color" content="#f6f6f4" />
-    <meta name="description" content="AIRLOCK evaluates agent tool calls against declared intent and records every decision." />
-    <meta property="og:title" content="AIRLOCK — Agent policy gateway" />
-    <title>AIRLOCK — Agent policy gateway</title>
+    <meta name="description" content="Bulkhead evaluates agent tool calls against declared intent and records every decision." />
+    <meta property="og:title" content="Bulkhead — Agent policy gateway" />
+    <title>Bulkhead — Agent policy gateway</title>
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath d='M4 27 14 5h4l10 22M9 18h14' fill='none' stroke='%231b1d1c' stroke-width='3' stroke-linejoin='round'/%3E%3C/svg%3E" />
     <link rel="stylesheet" href="/static/styles.css" />
     <script src="/static/app.js" defer></script>
@@ -14,7 +14,7 @@
   <body>
     <div class="app-shell">
       <header class="topbar">
-        <a class="brand" href="#activity" aria-label="AIRLOCK activity">AIRLOCK</a>
+        <a class="brand" href="#activity" aria-label="Bulkhead activity">Bulkhead</a>
         <nav class="main-nav" aria-label="Main navigation">
           <a href="#activity" data-page="activity" aria-current="page">Activity</a>
           <a href="#test" data-page="test">Test</a>
@@ -61,19 +61,19 @@
               <section class="panel routing-panel" aria-labelledby="routing-title">
                 <h2 id="routing-title">Request routing</h2>
                 <svg id="flow-diagram" class="flow-diagram" viewBox="0 0 440 178" role="img" aria-labelledby="flow-title flow-desc" preserveAspectRatio="xMidYMid meet">
-                  <title id="flow-title">Agent request routing</title><desc id="flow-desc">Agent requests reach AIRLOCK. Approved requests continue to tools; quarantined requests go to the HoneyWorld decoy.</desc>
+                  <title id="flow-title">Agent request routing</title><desc id="flow-desc">Agent requests reach Bulkhead. Approved requests continue to tools; quarantined requests go to the HoneyWorld decoy.</desc>
                   <defs><marker id="flow-arrow" viewBox="0 0 8 8" refX="8" refY="4" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0 L8 4 L0 8 Z" /></marker></defs>
                   <path class="route-in" d="M108 70 H150" marker-end="url(#flow-arrow)" />
                   <path class="route-tools" d="M270 70 H322" marker-end="url(#flow-arrow)" />
                   <path class="route-honey" d="M210 96 V148 H322" marker-end="url(#flow-arrow)" />
                   <rect class="box-agent" x="12" y="44" width="96" height="52" rx="4" /><text x="60" y="75" text-anchor="middle">Agent</text>
-                  <rect class="box-airlock" x="150" y="44" width="120" height="52" rx="4" /><text x="210" y="75" text-anchor="middle">AIRLOCK</text>
+                  <rect class="box-bulkhead" x="150" y="44" width="120" height="52" rx="4" /><text x="210" y="75" text-anchor="middle">Bulkhead</text>
                   <rect class="box-tools" x="322" y="44" width="106" height="52" rx="4" /><text x="375" y="75" text-anchor="middle">Tools</text>
                   <rect class="box-honey" x="322" y="126" width="106" height="44" rx="4" /><text x="375" y="145" text-anchor="middle">HoneyWorld</text><text class="flow-note" x="375" y="160" text-anchor="middle">(decoy)</text>
                 </svg>
                 <p class="meta" id="honey-summary">No actions routed to the decoy.</p>
                 <details class="disclosure"><summary>Captured actions</summary><ul id="capture-list"><li>No captures yet.</li></ul></details>
-                <details class="disclosure" id="containment-comparison"><summary>Without vs with AIRLOCK</summary><dl class="comparison"><div><dt>Without AIRLOCK</dt><dd id="without-action">No action evaluated</dd></div><div><dt>With AIRLOCK</dt><dd id="with-action">Awaiting decision</dd></div></dl></details>
+                  <details class="disclosure" id="containment-comparison"><summary>Without vs with Bulkhead</summary><dl class="comparison"><div><dt>Without Bulkhead</dt><dd id="without-action">No action evaluated</dd></div><div><dt>With Bulkhead</dt><dd id="with-action">Awaiting decision</dd></div></dl></details>
               </section>
             </aside>
           </div>
@@ -93,9 +93,9 @@
                   <div class="form-actions"><button class="text-button" id="default-intent" type="button">Reset to default</button><span class="meta" id="intent-status" role="status" aria-live="polite"></span></div>
                 </fieldset>
                 <fieldset class="form-section"><legend>Action</legend><p class="meta">Evaluate a proposed action with local mock tools.</p>
-                  <div class="field-pair"><div class="field"><label for="action-type">Action type</label><select id="action-type" name="action_type"><option value="read_file">read_file</option><option value="write_file">write_file</option><option value="run_command">run_command</option><option value="http_request">http_request</option><option value="github_action">github_action</option></select></div><div class="field"><label for="action-target">Target</label><input id="action-target" name="target" value="/workspace/README.md" required autocomplete="off" aria-describedby="action-target-error" /><span class="field-error" id="action-target-error" role="alert"></span></div></div>
+                  <div class="field-pair"><div class="field"><label for="action-type">Action type</label><select id="action-type" name="action_type"><option value="read_file">read_file</option><option value="write_file">write_file</option><option value="run_command">run_command</option><option value="http_request">http_request</option><option value="github_action">github_action</option></select></div><div class="field"><label for="action-target">Target</label><input id="action-target" name="target" value="/workspace/README.md" required autocomplete="off" aria-describedby="action-target-error" aria-invalid="false" /><span class="field-error" id="action-target-error" role="alert"></span></div></div>
                   <div class="field"><label for="action-content">Content <span class="hint">optional</span></label><textarea id="action-content" name="content" rows="2" placeholder="Message or content to inspect"></textarea></div>
-                  <div class="field"><label for="action-payload">Payload JSON <span class="hint">optional</span></label><textarea id="action-payload" name="payload" rows="2" placeholder='{"key":"value"}'></textarea></div>
+                  <div class="field"><label for="action-payload">Payload JSON <span class="hint">optional</span></label><textarea id="action-payload" name="payload" rows="2" placeholder='{"key":"value"}' aria-describedby="action-payload-error" aria-invalid="false"></textarea><span class="field-error" id="action-payload-error" role="alert"></span></div>
                    <div class="form-actions"><button class="button button-primary" id="evaluate-button" type="submit">Evaluate action</button><span class="meta keyboard-hint">Ctrl/Cmd + Enter</span><button class="text-button" id="safe-fixture" type="button">Load safe fixture</button><button class="text-button" id="malicious-fixture" type="button">Load attack fixture</button></div>
                   <p class="meta" id="action-status" role="status" aria-live="polite"></p>
                 </fieldset>
@@ -110,7 +110,7 @@
 
         <section class="app-page" id="page-exports" aria-labelledby="exports-title" hidden><div class="page-heading"><div><h1 id="exports-title">Exports</h1><p>Download records or preview an individual incident report.</p></div></div><section class="panel export-panel" aria-labelledby="download-title"><h2 id="download-title">Download data</h2><p class="meta export-description">Audit JSON contains full events, Events CSV is a flat ledger, Rules JSON contains generated fingerprints, and Incident JSON lists incidents.</p><div class="export-actions"><button class="button button-secondary" id="export-audit" type="button">Audit JSON</button><button class="button button-secondary" id="export-csv" type="button">Events CSV</button><button class="button button-secondary" id="export-rules" type="button">Rules JSON</button><button class="button button-secondary" id="export-incidents" type="button">Incident JSON</button></div><p class="meta" id="export-status" role="status" aria-live="polite"></p></section><section class="panel report-panel" aria-labelledby="report-title"><h2 id="report-title">Incident preview</h2><div class="report-controls"><div class="field"><label for="report-select">Incident</label><select id="report-select"><option value="">Select an incident</option></select></div><button class="button button-secondary" id="download-report" type="button">Download report</button></div><pre id="incident-preview">No incident selected.</pre></section></section>
       </main>
-      <footer class="footer">AIRLOCK · Local policy gateway</footer>
+      <footer class="footer">Bulkhead · Local policy gateway</footer>
     </div>
     <div class="drawer-backdrop" id="drawer-backdrop" hidden></div>
     <aside class="event-drawer" id="event-drawer" role="dialog" aria-modal="true" aria-labelledby="drawer-title" aria-hidden="true" hidden><div class="drawer-head"><h2 id="drawer-title">Event detail</h2><button class="text-button" id="drawer-close" type="button" aria-label="Close event detail">Close</button></div><div class="drawer-body" id="drawer-body"></div><div class="drawer-actions"><button class="button button-secondary" id="copy-event-json" type="button">Copy event JSON</button><button class="text-button" id="drawer-close-secondary" type="button">Close</button></div></aside>
