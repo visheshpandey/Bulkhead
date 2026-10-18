@@ -15,7 +15,7 @@ from urllib.parse import unquote
 from app.audit.ledger import EventLedger
 from app.honeyworld.simulation import HoneyWorld
 
-from .detectors import ThreatDetector, normalize_posix_target
+from .detectors import ThreatDetector, normalize_detection_text, normalize_posix_target
 from .llm_judge import LLMJudge
 from .models import (
     ActionType,
@@ -61,7 +61,7 @@ class PolicyGateway:
             "action_type": getattr(action.action_type, "value", action.action_type),
             "target": PolicyGateway._canonical_target(action.target),
             "finding_labels": sorted(finding.label for finding in findings),
-            "content": PolicyGateway._canonical_string(action.content or ""),
+            "content": normalize_detection_text(action.content or ""),
             "payload": PolicyGateway._canonical_value(action.payload),
         }
         encoded = json.dumps(value, sort_keys=True, default=str, separators=(",", ":"))
