@@ -29,7 +29,7 @@ _CONFUSABLES = str.maketrans({
 def normalize_posix_target(value: str) -> str:
     """Normalize a local target without allowing traversal outside its root.
 
-    AIRLOCK targets are POSIX paths even when the gateway runs on Windows.  URL
+    Bulkhead targets are POSIX paths even when the gateway runs on Windows.  URL
     targets are returned as URLs because collapsing ``https://`` would change
     their meaning; filesystem targets use POSIX separators and ``normpath``.
     """

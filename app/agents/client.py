@@ -1,4 +1,4 @@
-"""Small standard-library AIRLOCK HTTP client for agent integrations."""
+"""Small standard-library Bulkhead HTTP client for agent integrations."""
 
 from __future__ import annotations
 
@@ -13,16 +13,16 @@ from urllib.request import Request, urlopen
 from app.core.models import ActionType, AgentAction, UserIntent
 
 
-class AirlockBlocked(RuntimeError):
-    """Raised when AIRLOCK refuses or quarantines a tool call."""
+class BulkheadBlocked(RuntimeError):
+    """Raised when Bulkhead refuses or quarantines a tool call."""
 
     def __init__(self, decision: dict[str, Any]) -> None:
         self.decision = decision
-        super().__init__(decision.get("reason", "AIRLOCK blocked the tool call"))
+        super().__init__(decision.get("reason", "Bulkhead blocked the tool call"))
 
 
-class AirlockClient:
-    """Submit tool-call descriptions to AIRLOCK before executing them."""
+class BulkheadClient:
+    """Submit tool-call descriptions to Bulkhead before executing them."""
 
     def __init__(
         self,
@@ -78,7 +78,7 @@ class AirlockClient:
         """Evaluate a complete action and raise for BLOCK or QUARANTINE."""
         result = self.evaluate(action=action, intent=intent)
         if result.get("decision") in {"block", "quarantine"}:
-            raise AirlockBlocked(result)
+            raise BulkheadBlocked(result)
         return result
 
     # A concise alias is convenient in tool wrappers and keeps integrations readable.
@@ -88,7 +88,7 @@ class AirlockClient:
     def _post(self, path: str, body: dict[str, Any]) -> dict[str, Any]:
         headers = {"Content-Type": "application/json", "X-Agent-Id": self.agent_id}
         if self.api_key:
-            headers["X-Airlock-Key"] = self.api_key
+            headers["X-Bulkhead-Key"] = self.api_key
         request = Request(
             f"{self.base_url}{path}",
             data=json.dumps(body).encode("utf-8"),
@@ -100,18 +100,18 @@ class AirlockClient:
                 return json.loads(response.read().decode("utf-8"))
         except HTTPError as exc:
             detail = exc.read().decode("utf-8", errors="replace")
-            raise RuntimeError(f"AIRLOCK rejected request ({exc.code}): {detail}") from exc
+            raise RuntimeError(f"Bulkhead rejected request ({exc.code}): {detail}") from exc
 
 
-def guard(
-    client: AirlockClient,
+def bulkhead_guard(
+    client: BulkheadClient,
     *,
     action_type: ActionType | str,
     target: str | Callable[..., str] = "",
     content: str | Callable[..., str] | None = None,
     intent: UserIntent | dict[str, Any] | None = None,
 ) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
-    """Decorate a tool function so AIRLOCK approves it before invocation."""
+    """Decorate a tool function so Bulkhead approves it before invocation."""
 
     def decorate(function: Callable[..., Any]) -> Callable[..., Any]:
         @wraps(function)
@@ -125,7 +125,7 @@ def guard(
                 intent=intent,
             )
             if not result.get("allowed", result.get("decision") == "allow"):
-                raise PermissionError(result.get("reason", "AIRLOCK blocked the tool call"))
+                raise PermissionError(result.get("reason", "Bulkhead blocked the tool call"))
             return function(*args, **kwargs)
 
         return wrapped
@@ -134,7 +134,16 @@ def guard(
 
 
 def guard_tool(
-    client: AirlockClient, action_type: ActionType | str, *, target: str = ""
+    client: BulkheadClient, action_type: ActionType | str, *, target: str = ""
 ) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
     """Compatibility helper for the common fixed-target tool case."""
     return guard(client, action_type=action_type, target=target)
+
+
+# Deprecated compatibility aliases. New integrations should use the Bulkhead
+# names above, while existing legacy integrations continue to share the same
+# implementation and wire behavior.
+AirlockBlocked = BulkheadBlocked
+AirlockClient = BulkheadClient
+airlock_guard = bulkhead_guard
+guard = bulkhead_guard

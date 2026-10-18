@@ -1,4 +1,4 @@
-"""Backwards-compatible names for the AIRLOCK agent gateway client.
+"""Gateway client names for Bulkhead integrations.
 
 Some integrations historically imported ``gateway_client`` rather than the
 shorter ``client`` module.  Keep this module deliberately boring: the single
@@ -6,16 +6,31 @@ implementation remains in :mod:`app.agents.client`, so both paths get the same
 API-key, identity, and decision handling.
 """
 
-from .client import AirlockBlocked, AirlockClient, guard, guard_tool
+from .client import (
+    AirlockBlocked,
+    AirlockClient,
+    BulkheadBlocked,
+    BulkheadClient,
+    airlock_guard,
+    bulkhead_guard,
+    guard,
+    guard_tool,
+)
 
-GatewayClient = AirlockClient
-AirlockGatewayClient = AirlockClient
+GatewayClient = BulkheadClient
+BulkheadGatewayClient = BulkheadClient
+AirlockGatewayClient = BulkheadClient
 
 __all__ = [
     "AirlockBlocked",
     "AirlockClient",
     "AirlockGatewayClient",
+    "BulkheadBlocked",
+    "BulkheadClient",
+    "BulkheadGatewayClient",
     "GatewayClient",
+    "airlock_guard",
+    "bulkhead_guard",
     "guard",
     "guard_tool",
 ]

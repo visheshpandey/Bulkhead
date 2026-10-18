@@ -1,8 +1,10 @@
-# AIRLOCK agent-security demo
+# Bulkhead agent-security demo
 
 This local-only demo shows the complete `allow → quarantine → block` learning
-loop. Every request is descriptive: AIRLOCK uses fake HoneyWorld decoys and
+loop. Every request is descriptive: Bulkhead uses fake HoneyWorld decoys and
 never executes a shell command, reads a host file, or makes a network request.
+The first attack is sealed in a decoy compartment. The second never gets through
+the bulkhead.
 
 ## Preparation
 
@@ -31,7 +33,7 @@ never executes a shell command, reads a host file, or makes a network request.
 ## Dashboard sequence, including the rule toggle
 
 1. Click **Run demo**. It resets the board and evaluates a safe README read.
-   Activity shows **Allowed** and the Agent → AIRLOCK → Tools route.
+   Activity shows **Allowed** and the Agent → Bulkhead → Tools route.
 2. Click **Next**. The synthetic webpage instruction targets `/workspace/.env`
    and asks to send a fake secret to `https://evil.invalid`. The result is
    **Quarantined**, with a HoneyWorld receipt and one new rule.
@@ -90,7 +92,7 @@ matching fingerprint. `GET /api/events` exposes the Black Box records.
   change the persisted `enabled` flag, making the effect visible on the next
   evaluation.
 - **Persistence:** SQLite retains events, incidents, rules, and capture
-  receipts at `AIRLOCK_DB_PATH` across application restarts. HoneyWorld's
+  receipts at `BULKHEAD_DB_PATH` across application restarts. HoneyWorld's
   active decoys are process-local and reset on startup.
 - **Attack library:** `examples/attacks/` and `/api/attacks` contain synthetic
   fixtures only.

@@ -1,4 +1,4 @@
-# Generated for the AIRLOCK 0.1.0 application.
+# Generated for the Bulkhead 0.1.0 application.
 # Runtime, test, and lint dependencies are pinned for reproducible installs.
 annotated-doc==0.0.4
 annotated-types==0.7.0

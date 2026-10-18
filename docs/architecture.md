@@ -1,4 +1,4 @@
-# AIRLOCK architecture
+# Bulkhead architecture
 
 ## Exact evaluation pipeline
 
@@ -49,8 +49,8 @@ are `read_file`, `write_file`, `run_command`, `http_request`, and
 
 ## SQLite persistence
 
-`EventLedger` defaults to `./data/airlock.db`, overridable with
-`AIRLOCK_DB_PATH`. File-backed ledgers create their parent directory, enable
+`EventLedger` defaults to `./data/bulkhead.db`, overridable with
+`BULKHEAD_DB_PATH`. File-backed ledgers create their parent directory, enable
 SQLite WAL mode, and persist these collections:
 
 - `events`: every evaluation and its decision/findings;
@@ -66,15 +66,15 @@ for isolated tests.
 
 ## Security boundaries
 
-- The HTTP service is local-first; configure an API key with `AIRLOCK_API_KEY`
+- The HTTP service is local-first; configure an API key with `BULKHEAD_API_KEY`
   when a caller must authenticate.
-- `AgentAction` is descriptive data. AIRLOCK never executes the proposed tool
+- `AgentAction` is descriptive data. Bulkhead never executes the proposed tool
   call or makes external network requests.
 - HoneyWorld contains only fake files and returns explicit
   `network_called: false` and `shell_called: false` receipts.
 - `examples/attacks/` is a synthetic attack library. Never add real secrets,
   cookies, private keys, or production targets.
-- Docker creates writable `/app/data` and runs as the non-root `airlock` user;
+- Docker creates writable `/app/data` and runs as the non-root `bulkhead` user;
   `data/` and `.env` are ignored by Git.
 
 ## Attack library and agent integration
@@ -95,9 +95,9 @@ second time. The expected decisions are `allow → quarantine → block`.
 
 ## Configuration and delivery
 
-`.env.example` documents every supported variable: `AIRLOCK_ENV`,
-`AIRLOCK_HOST`, `AIRLOCK_PORT`, `AIRLOCK_DB_PATH`, `AIRLOCK_API_KEY`, and
-`AIRLOCK_LLM_JUDGE`. The host/port variables are documentation-friendly local
+`.env.example` documents every supported variable: `BULKHEAD_ENV`,
+`BULKHEAD_HOST`, `BULKHEAD_PORT`, `BULKHEAD_DB_PATH`, `BULKHEAD_API_KEY`, and
+`BULKHEAD_LLM_JUDGE`. The host/port variables are documentation-friendly local
 settings; the documented commands pass them to Uvicorn explicitly.
 
 CI provisions Python 3.11.9, installs the pinned `requirements.lock`, and runs

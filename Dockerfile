@@ -6,10 +6,12 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
+LABEL org.opencontainers.image.title="Bulkhead"
+
 COPY requirements.lock ./
 RUN python -m pip install --no-cache-dir --requirement requirements.lock
 
-RUN addgroup --system airlock && adduser --system --ingroup airlock airlock
+RUN addgroup --system bulkhead && adduser --system --ingroup bulkhead bulkhead
 
 COPY app ./app
 COPY tests ./tests
@@ -17,8 +19,8 @@ COPY docs ./docs
 COPY examples ./examples
 COPY README.md pyproject.toml .env.example ./
 
-RUN mkdir -p /app/data && chown -R airlock:airlock /app
-USER airlock
+RUN mkdir -p /app/data && chown -R bulkhead:bulkhead /app
+USER bulkhead
 
 EXPOSE 8000
 

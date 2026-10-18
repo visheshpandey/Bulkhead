@@ -1,7 +1,7 @@
 """A no-I/O adapter for guarding Model Context Protocol tool calls.
 
-The proxy only describes an MCP invocation to AIRLOCK.  A caller supplies the
-actual local ``invoke`` callback; it is called only after AIRLOCK returns an
+The proxy only describes an MCP invocation to Bulkhead.  A caller supplies the
+actual local ``invoke`` callback; it is called only after Bulkhead returns an
 ``allow`` decision.  This keeps the adapter safe to use in examples and tests:
 it never opens an MCP connection or executes a submitted tool by itself.
 """
@@ -13,7 +13,7 @@ from typing import Any
 
 from app.core.models import ActionType, UserIntent
 
-from .client import AirlockBlocked, AirlockClient
+from .client import BulkheadBlocked, BulkheadClient
 
 
 class MCPProxy:
@@ -21,7 +21,7 @@ class MCPProxy:
 
     def __init__(
         self,
-        client: AirlockClient,
+        client: BulkheadClient,
         invoke: Callable[[str, dict[str, Any]], Any] | None = None,
         *,
         action_type: ActionType | str = ActionType.RUN_COMMAND,
@@ -56,7 +56,7 @@ class MCPProxy:
         arguments = arguments or {}
         decision = self.evaluate(tool_name, arguments, intent)
         if decision.get("decision") != "allow":
-            raise AirlockBlocked(decision)
+            raise BulkheadBlocked(decision)
         callback = invoke or self.invoke
         if callback is None:
             return decision
@@ -67,6 +67,7 @@ class MCPProxy:
 
 
 MCPToolProxy = MCPProxy
+BulkheadMCPProxy = MCPProxy
 AirlockMCPProxy = MCPProxy
 
-__all__ = ["AirlockMCPProxy", "MCPProxy", "MCPToolProxy"]
+__all__ = ["AirlockMCPProxy", "BulkheadMCPProxy", "MCPProxy", "MCPToolProxy"]

@@ -1,4 +1,4 @@
-"""Typed inputs and outputs for the AIRLOCK policy gateway."""
+"""Typed inputs and outputs for the Bulkhead policy gateway."""
 
 from __future__ import annotations
 
@@ -38,7 +38,7 @@ def utc_now() -> datetime:
 
 
 class AgentAction(BaseModel):
-    """A tool call submitted to AIRLOCK, with no executable fields."""
+    """A tool call submitted to Bulkhead, with no executable fields."""
 
     model_config = ConfigDict(use_enum_values=True, extra="forbid", validate_default=True)
 

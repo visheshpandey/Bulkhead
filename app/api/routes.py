@@ -1,11 +1,10 @@
-"""HTTP routes for the local AIRLOCK policy gateway and audit trail."""
+"""HTTP routes for the local Bulkhead policy gateway and audit trail."""
 
 from __future__ import annotations
 
 import csv
 import io
 import json
-import os
 import time
 from collections import Counter, defaultdict, deque
 from collections.abc import Iterator
@@ -17,6 +16,7 @@ from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from fastapi.responses import PlainTextResponse, StreamingResponse
 
 from app.audit.ledger import ResetMessage
+from app.core.config import setting
 from app.core.detectors import normalize_posix_target
 from app.core.models import ActionType, AgentAction, Decision, UserIntent
 from app.core.policy import DEFAULT_INTENT, PolicyGateway
@@ -55,17 +55,23 @@ rate_limiter = _RateLimiter()
 
 
 def _authenticate(
-    api_key: str | None = Header(default=None, alias="X-Airlock-Key"),
-    legacy_api_key: str | None = Header(default=None, alias="X-API-Key"),
+    api_key: str | None = Header(default=None, alias="X-Bulkhead-Key"),
+    legacy_api_key: str | None = Header(default=None, alias="X-Airlock-Key"),
+    compatibility_api_key: str | None = Header(default=None, alias="X-API-Key"),
     authorization: str | None = Header(default=None),
 ) -> None:
-    """Enforce API-key auth only when AIRLOCK_API_KEY is configured."""
-    expected = os.getenv("AIRLOCK_API_KEY")
+    """Enforce API-key auth only when BULKHEAD_API_KEY is configured."""
+    expected = setting("API_KEY")
     if not expected:
         return
     bearer = authorization.removeprefix("Bearer ") if authorization else None
-    if api_key != expected and legacy_api_key != expected and bearer != expected:
-        raise HTTPException(status_code=401, detail="Invalid or missing AIRLOCK API key")
+    if (
+        api_key != expected
+        and legacy_api_key != expected
+        and compatibility_api_key != expected
+        and bearer != expected
+    ):
+        raise HTTPException(status_code=401, detail="Invalid or missing Bulkhead API key")
 
 
 router = APIRouter(prefix="/api")
@@ -269,7 +275,7 @@ def _incident_markdown(incident: Any) -> str:
     honeyworld = json.dumps(event.honeyworld_result if event else None, indent=2, default=str)
     rule_id = incident.immunity_rule_id or (event.immunity_rule_id if event else None) or "None"
     return (
-        f"# AIRLOCK Incident {incident.id}\n\n"
+        f"# Bulkhead Incident {incident.id}\n\n"
         f"- Status: **{incident.status}**\n"
         f"- Created: `{incident.created_at.isoformat()}`\n"
         f"- Event: `{incident.event_id}`\n"

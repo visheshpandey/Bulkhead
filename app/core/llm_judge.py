@@ -1,7 +1,7 @@
 """Optional, local-only explainability hook for borderline policy decisions.
 
 The policy engine is deterministic and authoritative.  When explicitly enabled
-by ``AIRLOCK_LLM_JUDGE=1``, a caller may provide a model callable for a second
+by ``BULKHEAD_LLM_JUDGE=1``, a caller may provide a model callable for a second
 opinion on scores from 30 through 69.  No provider, HTTP client, or network
 call is created by this module.
 """

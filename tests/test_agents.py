@@ -1,10 +1,11 @@
-from app.agents.gateway_client import AirlockGatewayClient, GatewayClient
+from app.agents.gateway_client import AirlockGatewayClient, BulkheadGatewayClient, GatewayClient
 from app.agents.mcp_proxy import MCPProxy
 from app.core.models import Decision
 
 
 def test_gateway_client_compatibility_names_share_implementation() -> None:
-    assert GatewayClient is AirlockGatewayClient
+    assert GatewayClient is BulkheadGatewayClient
+    assert AirlockGatewayClient is BulkheadGatewayClient
 
 
 class _StubClient:

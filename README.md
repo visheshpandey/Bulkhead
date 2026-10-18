@@ -1,8 +1,10 @@
-# AIRLOCK
+# Bulkhead
 
 ## A self-defending gateway for AI-agent actions
 
-AIRLOCK is a local, zero-trust gateway that evaluates an agent's proposed tool
+> Formerly AIRLOCK.
+
+Bulkhead is a local, zero-trust gateway that evaluates an agent's proposed tool
 call before the tool is invoked. It compares the action with user intent,
 detects prompt injection and sensitive-data handling, quarantines suspicious
 actions in a fully simulated HoneyWorld, and records an explainable Black Box
@@ -15,7 +17,7 @@ The complete product loop is:
 Protect → Attack → Observe → Learn → Harden → Re-test
 ```
 
-AIRLOCK never executes submitted shell commands, reads host files, calls a
+Bulkhead never executes submitted shell commands, reads host files, calls a
 network, or performs GitHub actions. Demo attacks and HoneyWorld values are
 synthetic.
 
@@ -39,7 +41,7 @@ Linux machine:
 
 ```bash
 git clone <repository-url>
-cd AIRLOCK
+cd <repository-directory>
 python3.11 -m venv .venv
 source .venv/bin/activate
 python -m pip install --upgrade pip
@@ -55,18 +57,19 @@ package installation is required.
 The project configuration surface documents the following variables. The
 values in `.env.example` are safe local defaults; `.env` is ignored and must
 never contain real credentials. The running gateway currently consumes
-`AIRLOCK_DB_PATH` and `AIRLOCK_API_KEY`; the host/port values are passed by the
-run commands and `AIRLOCK_LLM_JUDGE` reserves the optional judge integration
-flag.
+the `BULKHEAD_*` variables; the host/port values are passed by the run
+commands and `BULKHEAD_LLM_JUDGE` reserves the optional judge integration flag.
+Legacy environment variables remain accepted as a fallback for existing
+deployments.
 
 | Variable | Example | Purpose |
 | --- | --- | --- |
-| `AIRLOCK_ENV` | `development` | Environment label for local configuration. |
-| `AIRLOCK_HOST` | `127.0.0.1` | Documented local bind host. The run commands pass the host explicitly. |
-| `AIRLOCK_PORT` | `8000` | Documented local bind port. The run commands pass the port explicitly. |
-| `AIRLOCK_DB_PATH` | `./data/airlock.db` | SQLite file for events, incidents, immunity rules, and capture receipts. Use `:memory:` for an ephemeral process. |
-| `AIRLOCK_API_KEY` | *(blank)* | Optional API key. When set, evaluation requests require `X-Airlock-Key`, `X-API-Key`, or `Authorization: Bearer ...`. |
-| `AIRLOCK_LLM_JUDGE` | `0` | Enables the optional `{risk, rationale}` second check for borderline risk scores (30–69); deterministic policy remains authoritative. |
+| `BULKHEAD_ENV` | `development` | Environment label for local configuration. |
+| `BULKHEAD_HOST` | `127.0.0.1` | Documented local bind host. The run commands pass the host explicitly. |
+| `BULKHEAD_PORT` | `8000` | Documented local bind port. The run commands pass the port explicitly. |
+| `BULKHEAD_DB_PATH` | `./data/bulkhead.db` | SQLite file for events, incidents, immunity rules, and capture receipts. Use `:memory:` for an ephemeral process. |
+| `BULKHEAD_API_KEY` | *(blank)* | Optional API key. When set, evaluation requests require `X-Bulkhead-Key`, `X-API-Key`, or `Authorization: Bearer ...`. |
+| `BULKHEAD_LLM_JUDGE` | `0` | Enables the optional `{risk, rationale}` second check for borderline risk scores (30–69); deterministic policy remains authoritative. |
 
 The default database path is relative to the working directory. SQLite creates
 the parent directory, enables WAL mode for file databases, and reloads the
@@ -78,7 +81,7 @@ receipts are persisted in SQLite.
 
 ```bash
 source .venv/bin/activate
-python -m uvicorn app.main:app --host "${AIRLOCK_HOST:-127.0.0.1}" --port "${AIRLOCK_PORT:-8000}"
+python -m uvicorn app.main:app --host "${BULKHEAD_HOST:-127.0.0.1}" --port "${BULKHEAD_PORT:-8000}"
 ```
 
 Open <http://127.0.0.1:8000> (or the configured host and port).
@@ -86,13 +89,13 @@ Open <http://127.0.0.1:8000> (or the configured host and port).
 ## Run with Docker
 
 ```bash
-docker build --tag airlock:local .
-docker run --rm --publish 8000:8000 --env AIRLOCK_DB_PATH=/app/data/airlock.db \
-  --volume airlock-data:/app/data airlock:local
+docker build --tag bulkhead:local .
+docker run --rm --publish 8000:8000 --env BULKHEAD_DB_PATH=/app/data/bulkhead.db \
+  --volume bulkhead-data:/app/data bulkhead:local
 ```
 
 The image is based on Python 3.11.9, installs `requirements.lock`, creates
-`/app/data`, and runs as the unprivileged `airlock` user. The named volume is
+`/app/data`, and runs as the unprivileged `bulkhead` user. The named volume is
 optional but preserves the SQLite ledger between container restarts. Runtime
 data is ignored by Git.
 
@@ -101,6 +104,7 @@ data is ignored by Git.
 | Method | Endpoint | Use |
 | --- | --- | --- |
 | `GET` | `/health` | Liveness check. |
+| `GET` | `/api/health` | Compatibility liveness check. |
 | `GET` | `/api/state` | Events, incidents, rules, counts, and HoneyWorld state. |
 | `GET` | `/api/default-intent` | Canonical zero-trust intent used by the server and dashboard. |
 | `GET` | `/api/stream` | Live `audit_event` decisions and `reset` notifications (SSE). |
@@ -222,5 +226,5 @@ walkthrough.
 ## Safety boundary
 
 Use only fake secrets, mock tools, and non-production targets while developing
-or demonstrating AIRLOCK. Never put API keys, browser cookies, private keys, or
+or demonstrating Bulkhead. Never put API keys, browser cookies, private keys, or
 production credentials in fixtures, requests, logs, or the repository.

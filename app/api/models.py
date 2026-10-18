@@ -1,4 +1,4 @@
-"""HTTP request models for the AIRLOCK dashboard API."""
+"""HTTP request models for the Bulkhead dashboard API."""
 
 from __future__ import annotations
 

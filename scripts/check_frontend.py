@@ -15,9 +15,9 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
-os.environ["AIRLOCK_DB_PATH"] = ":memory:"
-os.environ.pop("AIRLOCK_API_KEY", None)
-os.environ["AIRLOCK_LLM_JUDGE"] = "0"
+os.environ["BULKHEAD_DB_PATH"] = ":memory:"
+os.environ.pop("BULKHEAD_API_KEY", None)
+os.environ["BULKHEAD_LLM_JUDGE"] = "0"
 
 import uvicorn
 from playwright.sync_api import expect, sync_playwright
@@ -88,7 +88,7 @@ def exercise(page, output: Path) -> None:
             page.locator(f"#{button}").click()
         assert download.value.failure() is None
     page.locator("#report-select").select_option(index=1)
-    expect(page.locator("#incident-preview")).to_contain_text("# AIRLOCK Incident")
+    expect(page.locator("#incident-preview")).to_contain_text("# Bulkhead Incident")
     with page.expect_download():
         page.locator("#download-report").click()
 

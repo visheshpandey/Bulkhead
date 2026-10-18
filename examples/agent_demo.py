@@ -1,4 +1,4 @@
-"""A local, no-I/O AIRLOCK agent flow with a synthetic malicious webpage."""
+"""A local, no-I/O Bulkhead agent flow with a synthetic malicious webpage."""
 
 import sys
 from pathlib import Path
@@ -37,7 +37,7 @@ def main() -> None:
     first = gateway.evaluate(malicious, intent)
     repeat = gateway.evaluate(malicious, intent)
     print("malicious webpage attempted .env read/exfiltration:", first.decision, "-", first.reason)
-    print("AIRLOCK stopped it in HoneyWorld:", first.honeyworld is not None)
+    print("Bulkhead stopped it in HoneyWorld:", first.honeyworld is not None)
     print("repeat stopped by immunity rule:", repeat.decision, "-", repeat.reason)
     assert first.honeyworld and first.honeyworld["network_called"] is False
     assert repeat.decision.value == "block"

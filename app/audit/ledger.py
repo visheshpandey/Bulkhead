@@ -1,13 +1,8 @@
-"""Thread-safe SQLite-backed Black Box event ledger.
-
-The default ``:memory:`` database keeps the original lightweight demo behavior.
-Set ``AIRLOCK_DB_PATH`` to a file to retain the audit trail across restarts.
-"""
+"""Thread-safe SQLite-backed Black Box event ledger."""
 
 from __future__ import annotations
 
 import json
-import os
 import sqlite3
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -16,6 +11,7 @@ from queue import Empty, Queue
 from threading import RLock
 from typing import Any, Self
 
+from app.core.config import database_path
 from app.core.models import AgentAction, AuditEvent, Decision, ImmunityRule, Incident, ThreatFinding
 
 
@@ -32,7 +28,7 @@ class EventLedger:
     def __init__(self, db_path: str | None = None) -> None:
         self._lock = RLock()
         self._subscribers: set[Queue[LedgerMessage]] = set()
-        self.db_path = db_path if db_path is not None else os.getenv("AIRLOCK_DB_PATH", "./data/airlock.db")
+        self.db_path = database_path(db_path)
         if self.db_path != ":memory:":
             Path(self.db_path).expanduser().parent.mkdir(parents=True, exist_ok=True)
         # One connection is deliberately retained for :memory: databases.

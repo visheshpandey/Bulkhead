@@ -45,15 +45,15 @@ def test_rule_lifecycle_and_audit_views() -> None:
 
 
 def test_api_key_is_optional_but_enforced_when_configured(monkeypatch) -> None:
-    monkeypatch.setenv("AIRLOCK_API_KEY", "test-key")
+    monkeypatch.setenv("BULKHEAD_API_KEY", "test-key")
     client = TestClient(app)
     assert client.post("/api/evaluate", json={"action_type": "read_file", "target": "/workspace/README.md"}).status_code == 401
     assert client.post(
         "/api/evaluate",
-        headers={"X-Airlock-Key": "test-key"},
+        headers={"X-Bulkhead-Key": "test-key"},
         json={"action_type": "read_file", "target": "/workspace/README.md"},
     ).status_code == 200
-    monkeypatch.delenv("AIRLOCK_API_KEY")
+    monkeypatch.delenv("BULKHEAD_API_KEY")
 
 
 def test_header_identity_is_persisted_and_disabled_rule_is_not_recreated() -> None:
