@@ -9,11 +9,16 @@ WORKDIR /app
 COPY requirements.lock ./
 RUN python -m pip install --no-cache-dir --requirement requirements.lock
 
+RUN addgroup --system airlock && adduser --system --ingroup airlock airlock
+
 COPY app ./app
 COPY tests ./tests
 COPY docs ./docs
 COPY examples ./examples
 COPY README.md pyproject.toml .env.example ./
+
+RUN mkdir -p /app/data && chown -R airlock:airlock /app
+USER airlock
 
 EXPOSE 8000
 
