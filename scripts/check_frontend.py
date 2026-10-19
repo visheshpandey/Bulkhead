@@ -37,6 +37,29 @@ def check_layout(page) -> None:
                for field in dimensions["fields"]), dimensions
 
 
+def check_plain_visual_contract(page) -> None:
+    effects = page.evaluate("""() => {
+      const visible = [...document.querySelectorAll('*')].filter((el) => {
+        const style = getComputedStyle(el);
+        const rect = el.getBoundingClientRect();
+        return rect.width > 0 && rect.height > 0 && style.display !== 'none' && style.visibility !== 'hidden';
+      });
+      const checks = visible.flatMap((el) => {
+        const selectors = [el.matches('#page-arena.active *') ? '#page-arena.active *' : el.tagName.toLowerCase()];
+        return [getComputedStyle(el), getComputedStyle(el, '::before'), getComputedStyle(el, '::after')]
+          .map((style, index) => ({
+            selector: selectors[0], pseudo: index === 1 ? '::before' : index === 2 ? '::after' : '',
+            backgroundImage: style.backgroundImage,
+            boxShadow: style.boxShadow,
+            filter: style.filter,
+          }));
+      });
+      return checks.filter((item) => item.backgroundImage.includes('gradient') ||
+        item.boxShadow !== 'none' || item.filter !== 'none');
+    }""")
+    assert effects == [], effects[:10]
+
+
 def exercise(page, output: Path, arena_statuses: list[int]) -> None:
     expect(page.locator("#connection-label")).to_have_text("Connected")
     assert page.locator("html").get_attribute("data-theme") == "light"
@@ -69,6 +92,27 @@ def exercise(page, output: Path, arena_statuses: list[int]) -> None:
         check_layout(page)
         page.screenshot(path=str(output / f"arena-dark-{width}.png"), full_page=True)
         page.locator("#theme-toggle").click()
+
+    page.set_viewport_size({"width": 1280, "height": 720})
+    page.evaluate("location.hash = '#arena'")
+    expect(page.locator("#page-arena")).to_be_visible()
+    check_plain_visual_contract(page)
+    check_layout(page)
+    assert page.evaluate("document.documentElement.scrollHeight") <= 720
+    page.locator("#arena-speed").select_option("2")
+    page.locator("#arena-watch").click()
+    expect(page.locator("#arena-finish")).to_be_visible(timeout=30000)
+    expect(page.locator("#arena-replay-result")).to_be_visible()
+    replay, with_flow = page.evaluate("""() => [
+      document.querySelector('#arena-replay-result').getBoundingClientRect().toJSON(),
+      document.querySelector('.arena-flow-with').getBoundingClientRect().toJSON(),
+    ]""")
+    assert replay["height"] > 0 and replay["bottom"] <= with_flow["bottom"] + 1, (replay, with_flow)
+    assert page.evaluate("document.documentElement.scrollHeight") <= 720
+    page.locator("#theme-toggle").click()
+    check_plain_visual_contract(page)
+    assert page.evaluate("document.documentElement.scrollHeight") <= 720
+    page.locator("#theme-toggle").click()
 
 
 def main() -> None:
