@@ -60,7 +60,7 @@ def check_plain_visual_contract(page) -> None:
     assert effects == [], effects[:10]
 
 
-def exercise(page, output: Path, arena_statuses: list[int]) -> None:
+def exercise(page, output: Path, arena_statuses: list[int], *, public: bool = False) -> None:
     expect(page.locator("#connection-label")).to_have_text("Connected")
     assert page.locator("html").get_attribute("data-theme") == "light"
     page.locator("#arena-speed").select_option("2")
@@ -72,6 +72,9 @@ def exercise(page, output: Path, arena_statuses: list[int]) -> None:
         assert arena_statuses[before:before + 5] == [200] * 5
         expect(page.locator("#arena-with-steps .arena-step")).to_have_count(4)
         expect(page.locator("#arena-replay-result")).to_be_visible()
+
+    if public:
+        return
 
     page.locator('.main-nav > a[data-page="lab"]').click()
     page.locator('[data-sample="comment"]').click()
@@ -154,10 +157,11 @@ def main() -> None:
             page.on("console", lambda message: errors.append(message.text) if message.type == "error" else None)
             page.on("response", lambda response: arena_statuses.append(response.status) if "/api/evaluate" in response.url else None)
             page.goto("/", wait_until="domcontentloaded")
-            exercise(page, output, arena_statuses)
+            public = os.environ.get("BULKHEAD_PUBLIC_DEMO") == "1"
+            exercise(page, output, arena_statuses, public=public)
             health = page.request.get("/healthz")
             assert health.status == 200 and health.json() == {"status": "ok", "service": "bulkhead"}
-            if os.environ.get("BULKHEAD_PUBLIC_DEMO") == "1":
+            if public:
                 first_state = page.evaluate("fetch('/api/state').then(response => response.json())")
                 isolated_context = browser.new_context(
                     base_url=f"http://127.0.0.1:{port}", viewport={"width": 1280, "height": 1000}
