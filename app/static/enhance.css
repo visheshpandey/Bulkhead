@@ -243,7 +243,7 @@ body:has(#page-arena.active) #run-demo-button { display: none; }
 #page-lab .panel::before, #page-activity .panel::before, #page-test .panel::before, #page-rules .panel::before, #page-exports .panel::before, #page-integrate .integrate-panel::before { content: ""; position: absolute; inset: 0 0 auto; height: 4px; background: var(--card-color, var(--accent)); }
 #page-lab .lab-score { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; padding: 0; border: 0; background: transparent; box-shadow: none; overflow: visible; }
 #page-lab .lab-score::before { display: none; }
-#page-lab .lab-score strong { display: flex; flex-direction: column; gap: 1px; padding: 14px 16px 13px; border-left: 5px solid var(--accent); border-radius: 12px; background: var(--accent-tint); color: var(--accent); font-size: 12px; text-transform: uppercase; letter-spacing: .08em; }
+#page-lab .lab-score strong { display: flex; flex-direction: column; gap: 1px; padding: 14px 16px 13px; border-left: 5px solid var(--accent); border-radius: 12px; background: var(--accent-tint); color: var(--accent); font-size: 12px; letter-spacing: .02em; }
 #page-lab .lab-score strong span { order: -1; font-size: 36px; line-height: 1; letter-spacing: -.06em; }
 #page-lab .lab-score strong:nth-child(2) { border-left-color: var(--allow); background: var(--allow-tint); color: var(--allow); }
 #page-lab .lab-score strong:nth-child(3) { border-left-color: var(--block); background: var(--block-tint); color: var(--block); }
@@ -291,7 +291,7 @@ html[data-theme="dark"] #page-integrate .code-head h2::before { box-shadow: none
 #page-test .scenario-panel, #page-test .action-form, #page-test .result-panel { padding: 18px; border: 1px solid var(--line); border-radius: var(--radius-card); background: var(--panel); box-shadow: none; }
 #page-test .panel > h2::before { background: var(--card-color); box-shadow: none; }
 #page-test .result-panel { border: 2px solid color-mix(in srgb, var(--allow) 36%, var(--line)); }
-#page-test .scenario-list h3 { display: inline-block; margin: 13px 0 6px; padding: 4px 8px; border-radius: 999px; background: var(--allow-tint); color: var(--allow); font-size: 10px; font-weight: 850; letter-spacing: .1em; text-transform: uppercase; }
+#page-test .scenario-list h3 { display: inline-block; margin: 13px 0 6px; padding: 4px 8px; border-radius: 999px; background: var(--allow-tint); color: var(--allow); font-size: 10px; font-weight: 850; letter-spacing: .02em; }
 #page-test .scenario-list section:nth-child(2) h3 { background: var(--quarantine-tint); color: var(--quarantine); }
 #page-test .scenario-list section:nth-child(3) h3 { background: var(--block-tint); color: var(--block); }
 #page-test .scenario-list section:nth-child(4) h3 { background: var(--accent-tint); color: var(--accent); }
@@ -322,6 +322,10 @@ html[data-theme="dark"] #page-integrate .code-head h2::before { box-shadow: none
 #page-exports .report-controls .button { border-color: #7c3aed; color: #7c3aed; }
 #page-exports .report-controls .button:hover { background: #7c3aed; color: #fff; }
 #page-exports #incident-preview { min-height: 190px; }
+#page-exports .export-actions { align-items: flex-start; }
+#page-exports .export-item { display: grid; gap: 4px; min-width: 170px; }
+#page-exports .export-item .button { width: 100%; }
+#page-exports .export-item .meta { margin: 0; line-height: 1.35; }
 
 /* The demo is a presentation surface at desktop size. Keep its four beats in
    one viewport, while leaving every other page naturally scrollable. */

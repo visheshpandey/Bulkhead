@@ -102,9 +102,31 @@ def test_frontend_branding_and_download_metadata_use_bulkhead() -> None:
 
 def test_static_assets_are_versioned_and_dashboard_is_not_cached() -> None:
     html = (STATIC / "index.html").read_text(encoding="utf-8")
-    assert 'href="/static/styles.css?v=0.1.0"' in html
-    assert 'href="/static/enhance.css?v=0.1.0"' in html
-    assert 'src="/static/app.js?v=0.1.0"' in html
+    assert 'href="/static/styles.css?v=4b874e6"' in html
+    assert 'href="/static/enhance.css?v=4b874e6"' in html
+    assert 'src="/static/app.js?v=4b874e6"' in html
+
+
+def test_final_copy_contracts_are_present() -> None:
+    html = (STATIC / "index.html").read_text(encoding="utf-8")
+    scenarios = json.loads((STATIC / "scenarios.json").read_text(encoding="utf-8"))
+    script = (STATIC / "app.js").read_text(encoding="utf-8")
+    assert 'id="without-result"' in html and "✗ Your passwords were stolen" in script
+    assert "A repeat of an earlier attack was blocked by a rule." in script
+    assert "All events (JSON)" in html and "Complete event ledger." in html
+    assert "Events table (CSV)" in html and "Spreadsheet-ready event table." in html
+    assert "Rules (JSON)" in html and "Learned Rules and fingerprints." in html
+    assert "Attacks (JSON)" in html and "Attack records and reports." in html
+    assert "All events (JSON) · Events table (CSV) · Rules (JSON) · Attacks (JSON)" not in html
+    assert [fixture["name"] for fixture in scenarios if fixture["id"] in {
+        "safe-readme", "dotenv", "payload-key", "leet-injection", "zero-width",
+        "base64-injection", "hex-injection", "webpage-injection", "rm-root", "git-force",
+    }] == [
+        "Read the README (safe)", "Disguised text (1gn0re)", "Invisible characters",
+        "Hidden in Base64", "Hidden in hex", "Send an API key in a request",
+        "Hidden instruction in a webpage", "Read the .env file",
+        "Delete everything (rm -rf /)", "Force push to main",
+    ]
 
 
 def test_arena_final_polish_contracts_are_present() -> None:
@@ -112,7 +134,7 @@ def test_arena_final_polish_contracts_are_present() -> None:
     script = (STATIC / "app.js").read_text(encoding="utf-8")
     for label in ("Read the page", "Opened your passwords", "Sent to attacker", "Answered"):
         assert label in script
-    assert "No checks. Every step runs." in script
+    assert "✗ Your passwords were stolen" in script
     assert "min-height: 40px" in css
     assert "Now try to trick it yourself → Try it" in script
     assert 'guideIndex === guideSteps.length - 1 ? "Done"' in script
@@ -140,7 +162,7 @@ def test_script_controls_exist_in_dashboard_markup() -> None:
     html = (STATIC / "index.html").read_text(encoding="utf-8")
     ids = set(re.findall(r'id="([^"]+)"', html))
     referenced = set(re.findall(r'\$\("([\w-]+)"\)', script))
-    assert referenced - {"refresh-button"} <= ids, f"Missing controls: {sorted(referenced - ids)}"
+    assert referenced - {"refresh-button", "event-count"} <= ids, f"Missing controls: {sorted(referenced - ids)}"
 
 
 def test_table_headers_match_rendered_cell_contract() -> None:
