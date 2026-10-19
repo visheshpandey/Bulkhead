@@ -33,5 +33,5 @@ jobs:
       - name: Run Ruff
         run: ruff check .
 
-      - name: Run tests
+      - name: Run canonical test command
         run: python -m pytest

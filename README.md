@@ -5,21 +5,31 @@ every proposed tool call against user intent, catches prompt injection and
 sensitive-data handling, sends suspicious actions to a synthetic Decoy, and
 keeps an explainable Black Box timeline.
 
-> **Live demo:** `https://your-live-demo-url.example` *(replace with the deployed URL)*
-
 ![Bulkhead demo](docs/demo.gif)
 
-## Run it locally
+## Clean Linux setup
 
 ```bash
-git clone <repository-url>
-cd <repository-directory>
+git clone https://github.com/visheshpandey/Bulkhead.git
+cd Bulkhead
+test "$(tr -d '\r\n' < .python-version)" = "3.11.9"
 python3.11 -m venv .venv
 source .venv/bin/activate
 python -m pip install --requirement requirements.lock
 python -m pip install --no-deps --no-build-isolation --editable .
 cp .env.example .env
-python -m uvicorn app.main:app --host 127.0.0.1 --port 8000
+```
+
+The project requires exactly Python **3.11.9**, as pinned in `.python-version`,
+the Dockerfile, CI, and package metadata. Dependencies are installed from the
+committed `requirements.lock`; the editable install provides the `bulkhead-mcp`
+console command. No global packages or secrets are required.
+
+## Run locally
+
+```bash
+source .venv/bin/activate
+python -m uvicorn app.main:app --host "${BULKHEAD_HOST:-127.0.0.1}" --port "${BULKHEAD_PORT:-8000}"
 ```
 
 Open <http://127.0.0.1:8000>. The dashboard is safe to demo: it never reads
@@ -45,17 +55,38 @@ blocks the same attack on replay.
 
 The full copy-ready snippets are in the dashboard's **Add to your agent** page.
 
-## Test and deploy
+## Test
 
 ```bash
-make test
-docker build --tag bulkhead:local .
-docker run --rm --publish 8000:8000 bulkhead:local
+python -m pytest
 ```
 
-For a public demo, create the included Render Blueprint from `render.yaml` and
-set `BULKHEAD_PUBLIC_DEMO=1`. Public mode gives each visitor an isolated,
-expiring in-memory session with request limits.
+`python -m pytest` is the single canonical test command. It runs the offline
+Python suite; when Node.js 22.14.0 is available, the frontend behavior test is
+also run by the suite. `make test` is a convenience alias. Ruff is the separate
+lint check used by CI.
+
+## Build and run with Docker
+
+```bash
+docker build --tag bulkhead:local .
+docker run --rm --publish 8000:8000 \
+  --env PORT=8000 \
+  --env BULKHEAD_DB_PATH=/app/data/bulkhead.db \
+  --volume bulkhead-data:/app/data \
+  bulkhead:local
+```
+
+The container runs as the unprivileged `bulkhead` user and listens on the
+container `PORT` variable. The named volume is optional and preserves the
+SQLite ledger between restarts.
+
+## Deploy a public demo
+
+The repository includes `render.yaml` for a Render Blueprint. Create a new
+Blueprint from `https://github.com/visheshpandey/Bulkhead`, select the
+`bulkhead-demo` service, and deploy it. Render supplies `PORT`, uses `/healthz`
+for health checks, and sets `BULKHEAD_PUBLIC_DEMO=1`.
 
 ## Implemented behavior
 
@@ -78,24 +109,6 @@ Protect → Attack → Observe → Learn → Harden → Re-test
   attack.
 - Every event, Attack, Rule, and Decoy capture is persisted by
   the SQLite-backed `EventLedger`.
-
-## Requirements and clean setup
-
-The project is pinned to Python **3.11.9** (`.python-version`). On a clean
-Linux machine:
-
-```bash
-git clone <repository-url>
-cd <repository-directory>
-python3.11 -m venv .venv
-source .venv/bin/activate
-python -m pip install --upgrade pip
-python -m pip install --requirement requirements.lock
-cp .env.example .env
-```
-
-`requirements.lock` contains runtime, test, and Ruff dependencies. No global
-package installation is required.
 
 ### Environment variables
 
@@ -120,38 +133,6 @@ the parent directory, enables WAL mode for file databases, and reloads the
 four persisted collections when a new `EventLedger` opens the same file.
 The active Decoy filesystem remains process-local; its captured
 receipts are persisted in SQLite.
-
-## Run locally
-
-```bash
-source .venv/bin/activate
-python -m uvicorn app.main:app --host "${BULKHEAD_HOST:-127.0.0.1}" --port "${BULKHEAD_PORT:-8000}"
-```
-
-Open <http://127.0.0.1:8000> (or the configured host and port).
-
-The local MCP integration exposes the `bulkhead-mcp` console command after the
-project is installed in the active environment.
-
-## Run with Docker
-
-```bash
-docker build --tag bulkhead:local .
-docker run --rm --publish 8000:8000 --env BULKHEAD_DB_PATH=/app/data/bulkhead.db \
-  --volume bulkhead-data:/app/data bulkhead:local
-```
-
-The image is based on Python 3.11.9, installs `requirements.lock`, creates
-`/app/data`, and runs as the unprivileged `bulkhead` user. The named volume is
-optional but preserves the SQLite ledger between container restarts. Runtime
-data is ignored by Git.
-
-## Deploy a public demo
-
-The repository includes `render.yaml` for a one-click Render web service. Create
-a new Blueprint from the repository and deploy the `bulkhead-demo` service. The
-service listens on Render's `PORT`, uses `/healthz` for health checks, and sets
-`BULKHEAD_PUBLIC_DEMO=1`.
 
 Public mode gives each visitor an expiring, httpOnly session cookie. Events,
 Attacks, Rules, Decoy receipts, lab scores, and reset operations
@@ -241,8 +222,8 @@ python -m pytest
 ```
 
 GitHub Actions uses Python 3.11.9 and the Node version pinned in `.nvmrc`, installs
-`requirements.lock`, then runs those exact Ruff and pytest commands. The checks
-are offline after dependency installation.
+`requirements.lock`, then runs `ruff check .` and the same `python -m pytest` command.
+The checks are offline after dependency installation.
 
 With Node.js available, pytest also runs the dependency-free dashboard behavior
 tests; they can be run directly with `node --test tests/frontend.behavior.test.cjs`.
@@ -260,7 +241,7 @@ python scripts/check_frontend.py
 Chromium needs the operating system libraries listed by Playwright on Linux;
 the normal FastAPI container does not need browser packages. The browser check
 starts its own loopback server with an in-memory database, never touches the
-running demo database, checks all four pages at 1440/1024/375px, and saves light
+running demo database, checks all seven pages at 1280/768/414/375px, and saves light
 and dark screenshots to `artifacts/frontend/` (Git-ignored). It exercises all
 15 scenarios twice, the four demo steps, rules, exports, and a cross-client reset,
 and fails on console errors or page overflow.

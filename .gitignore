@@ -6,7 +6,10 @@ __pycache__/
 data/
 .ruff_cache/
 *.log
+*.log*
+*.tmp-*
 dist/
 build/
 *.egg-info/
 artifacts/frontend/
+.opencode/
