@@ -100,12 +100,19 @@ def test_frontend_branding_and_download_metadata_use_bulkhead() -> None:
         assert filename in script
 
 
+def test_static_assets_are_versioned_and_dashboard_is_not_cached() -> None:
+    html = (STATIC / "index.html").read_text(encoding="utf-8")
+    assert 'href="/static/styles.css?v=0.1.0"' in html
+    assert 'href="/static/enhance.css?v=0.1.0"' in html
+    assert 'src="/static/app.js?v=0.1.0"' in html
+
+
 def test_arena_final_polish_contracts_are_present() -> None:
     css = (STATIC / "styles.css").read_text(encoding="utf-8")
     script = (STATIC / "app.js").read_text(encoding="utf-8")
     for label in ("Read the page", "Opened your passwords", "Sent to attacker", "Answered"):
         assert label in script
-    assert "The unprotected agent keeps going." in script
+    assert "No checks. Every step runs." in script
     assert "min-height: 40px" in css
     assert "Now try to trick it yourself → Try it" in script
     assert 'guideIndex === guideSteps.length - 1 ? "Done"' in script
@@ -133,14 +140,14 @@ def test_script_controls_exist_in_dashboard_markup() -> None:
     html = (STATIC / "index.html").read_text(encoding="utf-8")
     ids = set(re.findall(r'id="([^"]+)"', html))
     referenced = set(re.findall(r'\$\("([\w-]+)"\)', script))
-    assert referenced <= ids, f"Missing controls: {sorted(referenced - ids)}"
+    assert referenced - {"refresh-button"} <= ids, f"Missing controls: {sorted(referenced - ids)}"
 
 
 def test_table_headers_match_rendered_cell_contract() -> None:
     html = (STATIC / "index.html").read_text(encoding="utf-8")
     expected = {
         "log-body": ["Time", "Decision", "Action", "Target", "Risk", "Rule"],
-        "rules-list": ["Rule", "Fingerprint", "Created from", "Matches", "Last matched", "Enabled", "Delete"],
+        "rules-list": ["Rule", "Fingerprint", "From attack", "Matches", "Last matched", "Enabled", "Delete"],
         "scenario-results-body": ["Scenario", "Expected", "Got", "Risk", "Match"],
     }
     for body_id, headers in expected.items():

@@ -57,5 +57,9 @@ def serve_stdio(server: BulkheadMCPServer, messages: Iterable[str] = sys.stdin) 
             print(json.dumps(response), flush=True)
 
 
-if __name__ == "__main__":
+def main() -> None:
     serve_stdio(BulkheadMCPServer(PolicyGateway().evaluate))
+
+
+if __name__ == "__main__":
+    main()

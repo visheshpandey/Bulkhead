@@ -33,6 +33,8 @@ def test_public_sessions_are_isolated_and_reset_is_local(monkeypatch) -> None:
     payload = {"action_type": "read_file", "target": "/workspace/README.md"}
 
     assert first.get("/").status_code == 200
+    assert first.get("/").headers["cache-control"] == "no-cache"
+    assert first.get("/static/index.html").headers["cache-control"] == "no-cache"
     assert second.get("/").status_code == 200
     assert first.post("/api/evaluate", json=payload).status_code == 200
     assert len(first.get("/api/state").json()["events"]) == 1

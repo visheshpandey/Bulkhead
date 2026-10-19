@@ -31,15 +31,15 @@ class HoneyWorld:
             "shell_called": False,
         }
         if action.action_type == ActionType.READ_FILE:
-            result["output"] = self._files.get(action.target, "[HoneyWorld] decoy file not found")
+            result["output"] = self._files.get(action.target, "[Decoy] fake file not found")
         elif action.action_type == ActionType.WRITE_FILE:
             self._files[action.target] = str(action.payload.get("content", action.content or ""))
-            result["output"] = "[HoneyWorld] write captured in sandbox"
+            result["output"] = "[Decoy] write captured in fake data"
         elif action.action_type == ActionType.RUN_COMMAND:
             result["shell_called"] = False
-            result["output"] = "[HoneyWorld] command captured; no process executed"
+            result["output"] = "[Decoy] command captured; no process executed"
         elif action.action_type in {ActionType.HTTP_REQUEST, ActionType.GITHUB_ACTION}:
-            result["output"] = "[HoneyWorld] external operation captured; no network called"
+            result["output"] = "[Decoy] external operation captured; no network called"
         self._actions.append(result)
         return result
 

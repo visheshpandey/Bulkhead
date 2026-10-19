@@ -227,7 +227,7 @@ class EventLedger:
                     id=self._next_id("immunity_rules", "immune-"),
                     fingerprint=fingerprint,
                     source_incident_id=incident.id,
-                    description=f"Block the quarantined action fingerprint {fingerprint}.",
+                    description=f"Rule blocks a repeat attack with fingerprint {fingerprint}.",
                 )
                 self._connection.execute(
                     """INSERT INTO immunity_rules

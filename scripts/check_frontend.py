@@ -76,7 +76,7 @@ def exercise(page, output: Path, arena_statuses: list[int]) -> None:
     page.locator('[data-page="lab"]').click()
     page.locator('[data-sample="comment"]').click()
     page.locator("#lab-run").click()
-    expect(page.locator("#lab-status")).to_contain_text("Bulkhead", timeout=10000)
+    expect(page.locator("#lab-status")).to_contain_text("Blocked", timeout=10000)
 
     for width in (1440, 1024, 375):
         page.set_viewport_size({"width": width, "height": 1000 if width > 400 else 812})
@@ -93,22 +93,27 @@ def exercise(page, output: Path, arena_statuses: list[int]) -> None:
         page.screenshot(path=str(output / f"arena-dark-{width}.png"), full_page=True)
         page.locator("#theme-toggle").click()
 
-    page.set_viewport_size({"width": 1280, "height": 720})
-    page.evaluate("location.hash = '#arena'")
-    expect(page.locator("#page-arena")).to_be_visible()
-    check_plain_visual_contract(page)
-    check_layout(page)
-    assert page.evaluate("document.documentElement.scrollHeight") <= 720
-    page.locator("#arena-speed").select_option("2")
-    page.locator("#arena-watch").click()
-    expect(page.locator("#arena-finish")).to_be_visible(timeout=30000)
-    expect(page.locator("#arena-replay-result")).to_be_visible()
-    replay, with_flow = page.evaluate("""() => [
-      document.querySelector('#arena-replay-result').getBoundingClientRect().toJSON(),
-      document.querySelector('.arena-flow-with').getBoundingClientRect().toJSON(),
-    ]""")
-    assert replay["height"] > 0 and replay["bottom"] <= with_flow["bottom"] + 1, (replay, with_flow)
-    assert page.evaluate("document.documentElement.scrollHeight") <= 720
+    for height in (666, 720):
+        page.set_viewport_size({"width": 1280, "height": height})
+        page.goto("/#arena", wait_until="networkidle")
+        expect(page.locator("#page-arena")).to_be_visible()
+        expect(page.locator("#connection-label")).to_have_text("Connected")
+        check_plain_visual_contract(page)
+        check_layout(page)
+        assert page.evaluate("document.documentElement.scrollHeight") <= height
+        page.locator("#arena-speed").select_option("2")
+        page.locator("#arena-watch").click()
+        expect(page.locator("#arena-finish")).to_be_visible(timeout=30000)
+        expect(page.locator("#arena-with-steps .arena-step")).to_have_count(4)
+        expect(page.locator("#arena-replay-result")).to_be_visible(timeout=30000)
+        replay, with_flow, finish = page.evaluate("""() => [
+          document.querySelector('#arena-replay-result').getBoundingClientRect().toJSON(),
+          document.querySelector('.arena-flow-with').getBoundingClientRect().toJSON(),
+          document.querySelector('#arena-finish').getBoundingClientRect().toJSON(),
+        ]""")
+        assert replay["height"] > 0 and replay["bottom"] <= with_flow["bottom"] + 1, (height, replay, with_flow)
+        assert replay["bottom"] <= finish["top"] or replay["top"] >= finish["bottom"], (height, replay, finish)
+        assert page.evaluate("document.documentElement.scrollHeight") <= height
     page.locator("#theme-toggle").click()
     check_plain_visual_contract(page)
     assert page.evaluate("document.documentElement.scrollHeight") <= 720

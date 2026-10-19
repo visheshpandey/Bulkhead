@@ -15,20 +15,21 @@ normalise → fingerprint → immunity → detectors → intent → decision →
 2. **fingerprint** — hash the canonical action type, target, detector labels,
    and content into a stable short fingerprint. Agent ID and metadata are not
    part of the operation identity.
-3. **immunity** — look up an enabled fingerprint rule. A match is immediately
-   a `block` with the `known_quarantined_action` finding and increments the
-   rule's match count.
+3. **Rule** — look up an enabled fingerprint Rule. A match is immediately
+   `Blocked` with the `known_quarantined_action` finding and increments the
+   Rule's match count.
 4. **detectors** — inspect target, content, payload, and metadata for prompt
    injection, sensitive files/fields/material, secret exfiltration, and
    destructive commands. Base64 and hex text are decoded for inspection.
 5. **intent** — compare action type, normalized target, denied/allowed target
    roots, and network permission with the supplied `UserIntent`.
-6. **decision** — choose `allow`, `block`, or `quarantine`. Destructive
-   commands and intent violations block; high-severity security findings are
-   quarantined unless an enabled immunity rule already blocked them.
-7. **ledger/HoneyWorld** — persist the `AuditEvent` in SQLite. A quarantine
-   also persists an `Incident`, generates an immunity rule, and (when
-   `run_honeyworld` is true) records a simulated HoneyWorld capture. No shell,
+6. **decision** — choose Allowed, Blocked, or Decoyed (wire values remain
+   `allow`, `block`, or `quarantine`). Destructive commands and intent violations
+   block; high-severity security findings are decoyed unless an enabled Rule
+   already blocked them.
+7. **ledger/Decoy** — persist the `AuditEvent` in SQLite. A Decoyed action
+   also persists an `Attack`, generates a Rule, and (when `run_honeyworld` is
+   true) records a simulated Decoy capture. No shell,
    filesystem, network, or GitHub operation is executed.
 
 ## Components
@@ -39,12 +40,13 @@ AgentClient / dashboard
           ▼
 FastAPI routes → PolicyGateway → EventLedger (SQLite)
                          │                 └→ events, incidents, rules, captures
-                         └→ HoneyWorld (fake files; no-op external actions)
+                          └→ Decoy (fake data; no-op external actions)
 ```
 
 The API accepts either an `action` object or flat `action_type`, `target`,
 `payload`, `content`, `agent_id`, and `metadata` fields. Supported action types
-are `read_file`, `write_file`, `run_command`, `http_request`, and
+are Read file, Write file, Run command, Web request, and GitHub action. The
+wire values are `read_file`, `write_file`, `run_command`, `http_request`, and
 `github_action`.
 
 ## SQLite persistence
@@ -54,9 +56,9 @@ are `read_file`, `write_file`, `run_command`, `http_request`, and
 SQLite WAL mode, and persist these collections:
 
 - `events`: every evaluation and its decision/findings;
-- `incidents`: quarantine records and fingerprints;
-- `immunity_rules`: generated rules, enabled state, match count, and timestamp;
-- `honeyworld_captures`: simulated quarantine receipts.
+- `incidents`: Attack records and fingerprints;
+- `immunity_rules`: generated Rules, enabled state, match count, and timestamp;
+- `honeyworld_captures`: simulated Decoy receipts.
 
 Opening another `EventLedger` on the same database reloads those records. The
 active HoneyWorld decoy files and its in-process action list are reset when the
@@ -91,7 +93,7 @@ python examples/agent_demo.py
 
 The API demo (`POST /api/demo`) resets the ledger and evaluates a safe README
 read, a synthetic webpage instruction aimed at `.env`, and the same action a
-second time. The expected decisions are `allow → quarantine → block`.
+second time. The expected decisions are Allowed → Decoyed → Blocked.
 
 ## Configuration and delivery
 

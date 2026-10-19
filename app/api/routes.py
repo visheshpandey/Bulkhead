@@ -27,6 +27,19 @@ from .models import DemoResponse, EvaluateRequest, LabReportRequest, LabRunReque
 
 gateway = PolicyGateway()
 
+ACTION_LABELS = {
+    ActionType.READ_FILE: "Read file",
+    ActionType.WRITE_FILE: "Write file",
+    ActionType.RUN_COMMAND: "Run command",
+    ActionType.HTTP_REQUEST: "Web request",
+    ActionType.GITHUB_ACTION: "GitHub action",
+}
+DECISION_LABELS = {
+    Decision.ALLOW: "Allowed",
+    Decision.BLOCK: "Blocked",
+    Decision.QUARANTINE: "Decoyed",
+}
+
 
 def gateway_for_request(request: Request | None = None) -> PolicyGateway:
     """Select the global gateway or the current visitor's isolated gateway."""
@@ -173,16 +186,16 @@ def export_audit(request: Request, format: str = Query(default="json", pattern="
         return payload
     output = io.StringIO()
     writer = csv.writer(output)
-    writer.writerow(["id", "timestamp", "agent_id", "action_type", "target", "decision", "risk_score", "reason"])
+    writer.writerow(["ID", "Timestamp", "Agent ID", "Action", "Target", "Decision", "Risk", "Reason"])
     for event in gw.ledger.events():
         writer.writerow(
             [
                 event.id,
                 event.timestamp.isoformat(),
                 event.agent_id or "",
-                _enum_value(event.action.action_type),
+                ACTION_LABELS.get(event.action.action_type, _enum_value(event.action.action_type)),
                 event.action.target,
-                _enum_value(event.decision),
+                DECISION_LABELS.get(event.decision, _enum_value(event.decision)),
                 event.risk_score,
                 event.reason,
             ]
@@ -302,7 +315,7 @@ def _incident_markdown(incident: Any, gw: PolicyGateway) -> str:
     honeyworld = json.dumps(event.honeyworld_result if event else None, indent=2, default=str)
     rule_id = incident.immunity_rule_id or (event.immunity_rule_id if event else None) or "None"
     return (
-        f"# Bulkhead Incident {incident.id}\n\n"
+        f"# Bulkhead Attack {incident.id}\n\n"
         f"- Status: **{incident.status}**\n"
         f"- Created: `{incident.created_at.isoformat()}`\n"
         f"- Event: `{incident.event_id}`\n"
@@ -313,7 +326,7 @@ def _incident_markdown(incident: Any, gw: PolicyGateway) -> str:
         f"{action}\n```\n\n"
         "## Findings\n\n"
         f"{findings}\n"
-        "## HoneyWorld receipt\n\n```json\n"
+        "## Decoy (fake data) receipt\n\n```json\n"
         f"{honeyworld}\n```\n"
     )
 

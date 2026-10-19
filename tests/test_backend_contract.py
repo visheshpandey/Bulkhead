@@ -45,7 +45,7 @@ def test_header_identity_is_distinct_from_compatibility_action_identity() -> Non
     assert [event["agent_id"] for event in client.get("/api/events").json()["events"]] == ["real-agent", None]
     assert client.get("/api/stats").json()["by_agent"] == {"real-agent": 1, "null": 1}
     rows = list(csv.DictReader(io.StringIO(client.get("/api/export.csv").text)))
-    assert [row["agent_id"] for row in rows] == ["real-agent", ""]
+    assert [row["Agent ID"] for row in rows] == ["real-agent", ""]
     assert client.post("/api/evaluate", headers={"X-Agent-Id": " "}, json=payload).status_code == 422
 
 

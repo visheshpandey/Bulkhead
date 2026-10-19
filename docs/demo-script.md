@@ -1,9 +1,9 @@
 # Bulkhead agent-security demo
 
-This local-only demo shows the complete `allow → quarantine → block` learning
-loop. Every request is descriptive: Bulkhead uses fake HoneyWorld decoys and
+This local-only demo shows the complete Allowed → Decoyed → Blocked learning
+loop. Every request is descriptive: Bulkhead uses fake Decoy data and
 never executes a shell command, reads a host file, or makes a network request.
-The first attack is sealed in a decoy compartment. The second never gets through
+The first attack is sent to a Decoy. The second never gets through
 the bulkhead.
 
 ## Preparation
@@ -36,19 +36,19 @@ the bulkhead.
    Activity shows **Allowed** and the Agent → Bulkhead → Tools route.
 2. Click **Next**. The synthetic webpage instruction targets `/workspace/.env`
    and asks to send a fake secret to `https://evil.invalid`. The result is
-   **Quarantined**, with a HoneyWorld receipt and one new rule.
-3. Click the quarantine row. Show the findings, fake output, fingerprint,
-   incident and rule IDs, and full JSON. Close the drawer with **Esc**.
+    **Decoyed — the attacker got fake data**, with a Decoy receipt and one new Rule.
+3. Click the decoyed row. Show the findings, fake output, fingerprint,
+   Attack and Rule IDs, and full JSON. Close the drawer with **Esc**.
 4. Click **Next**. The identical attack is **Blocked** by the generated rule.
 5. Click **Next**. A leetspeak version is also **Blocked** by that rule after
    content normalization. Click **Exit demo** to end the guided session.
-6. Open **Rules** and disable the rule. Open **Test**, choose **Load attack
-   fixture**, and evaluate. It is quarantined again; the disabled rule is reused.
-7. Re-enable the rule in **Rules** and evaluate the same fixture again in
+6. Open **Rules** and disable the Rule. Open **Test**, choose **Load attack
+   fixture**, and evaluate. It is decoyed again; the disabled Rule is reused.
+7. Re-enable the Rule in **Rules** and evaluate the same fixture again in
    **Test**. It is blocked. Delete asks for confirmation.
 8. In **Test**, reset the intent to default and click **Run all scenarios**.
    The 15 fixtures match their declared expectations without clearing audit data.
-9. Open **Exports**, select an incident, preview the Markdown as plain text,
+9. Open **Exports**, select an Attack, preview the Markdown as plain text,
    and download it. JSON/CSV downloads remain available on that page.
 
 ## API-driven sequence

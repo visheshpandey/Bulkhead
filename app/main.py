@@ -100,6 +100,8 @@ async def public_security_middleware(request: Request, call_next):
 
     response = await call_next(request)
     _set_security_headers(response)
+    if request.url.path in {"/", "/static/index.html"}:
+        response.headers["Cache-Control"] = "no-cache"
     if public and session_required and session_id and set_session_cookie:
         response.set_cookie(
             PUBLIC_SESSION_COOKIE,
@@ -115,7 +117,7 @@ async def public_security_middleware(request: Request, call_next):
 
 @app.get("/", include_in_schema=False)
 def dashboard() -> FileResponse:
-    return FileResponse(STATIC_DIR / "index.html")
+    return FileResponse(STATIC_DIR / "index.html", headers={"Cache-Control": "no-cache"})
 
 
 @app.get("/health")

@@ -192,7 +192,7 @@ class PolicyGateway:
                 )
             ]
             decision = Decision.BLOCK
-            reason = "Blocked by an immunity rule generated from a prior quarantine."
+            reason = "Blocked by a Rule generated from a prior attack."
             risk_score = 100
         elif any(f.category == ThreatCategory.DESTRUCTIVE_COMMAND for f in findings):
             decision = Decision.BLOCK
@@ -200,7 +200,7 @@ class PolicyGateway:
             risk_score = min(100, max(f.severity for f in findings))
         elif has_prompt_injection or has_sensitive_file or has_keyword_network or high_security_finding:
             decision = Decision.QUARANTINE
-            reason = "Suspicious action isolated in HoneyWorld for safe observation."
+            reason = "Decoyed for safe observation with fake data."
             risk_score = min(100, max(f.severity for f in findings))
         elif any(finding.category == ThreatCategory.INTENT_VIOLATION for finding in findings):
             decision = Decision.BLOCK

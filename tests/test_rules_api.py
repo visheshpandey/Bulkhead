@@ -39,7 +39,7 @@ def test_rule_lifecycle_and_audit_views() -> None:
     assert client.get(f"/api/events/{event_id}").status_code == 200
     assert client.get(f"/api/incidents/{incident_id}/report").headers["content-type"].startswith("text/markdown")
     assert "audit_event" in client.get("/api/events/stream").text
-    assert "decision" in client.get("/api/export?format=csv").text.splitlines()[0]
+    assert "Decision" in client.get("/api/export?format=csv").text.splitlines()[0]
     assert client.get("/api/stats").json()["events"] == 2
     assert client.delete(f"/api/rules/{rule_id}").status_code == 200
 
@@ -75,13 +75,14 @@ def test_header_identity_is_persisted_and_disabled_rule_is_not_recreated() -> No
     assert len(client.get("/api/rules").json()["rules"]) == 1
 
 
-def test_reports_alias_and_csv_use_wire_enum_values() -> None:
+def test_reports_alias_and_csv_use_display_labels() -> None:
     client = TestClient(app)
     client.post("/api/reset-demo")
     client.post("/api/evaluate", json={"action_type": "read_file", "target": "/workspace/README.md"})
     assert client.get("/api/reports/missing").status_code == 404
     csv_text = client.get("/api/export.csv").text
-    assert "read_file" in csv_text
+    assert "Read file" in csv_text
+    assert "Allowed" in csv_text
     assert "Decision.ALLOW" not in csv_text
 
 

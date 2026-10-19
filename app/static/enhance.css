@@ -367,7 +367,8 @@ html[data-theme="dark"] #page-integrate .code-head h2::before { box-shadow: none
   #page-arena .arena-caption { justify-self: start; padding: 6px 10px; font-size: 12px; }
   #page-arena .arena-finish { width: 100%; padding: 8px 11px; }
   #page-arena .arena-finish strong { font-size: 15px; }
-  #page-arena .arena-finish-actions { display: inline-flex; margin-left: 10px; vertical-align: middle; }
+  #page-arena .arena-finish { display: flex; align-items: center; gap: 10px; }
+  #page-arena .arena-finish-actions { display: inline-flex; margin-left: auto; vertical-align: middle; }
   #page-arena .arena-finish .button { min-height: 30px; padding: 4px 9px; font-size: 12px; }
   #page-arena .arena-controls { grid-column: 2; grid-row: 4; align-self: center; margin: 0; padding: 5px; }
   #page-arena .arena-controls .button { min-height: 30px; padding: 4px 9px; font-size: 12px; }
@@ -554,10 +555,17 @@ html[data-theme="dark"] {
 .empty-state, .empty-state::before { background: var(--panel); }
 
 @media (min-width: 960px) and (min-height: 600px) {
-  #page-arena .arena-flow { overflow: visible; }
+  #page-arena .arena-flow { overflow: hidden; }
   #page-arena .icon-flow { height: 112px; max-height: 112px; margin: 8px 0 4px; }
   #page-arena .flow-heading { min-height: 44px; }
   #page-arena .arena-step { min-height: 31px; }
   #page-arena .arena-flow-with .step-list { margin-bottom: 0; }
   #page-arena #arena-replay-result:not([hidden]) { display: block; margin-top: 8px; }
+}
+
+@media (min-width: 960px) and (max-height: 720px) {
+  #page-arena .arena-flow { overflow: visible; }
+  #page-arena .arena-flows { min-height: 0; }
+  #page-arena .arena-flow-with { padding-bottom: 8px; }
+  #page-arena #arena-replay-result:not([hidden]) { margin-bottom: 0; }
 }

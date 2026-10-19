@@ -4,10 +4,9 @@
 
 Bulkhead is a local, zero-trust gateway that evaluates an agent's proposed tool
 call before the tool is invoked. It compares the action with user intent,
-detects prompt injection and sensitive-data handling, quarantines suspicious
-actions in a fully simulated HoneyWorld, and records an explainable Black Box
-timeline. A quarantined fingerprint becomes an immunity rule, so a repeat is
-blocked immediately.
+detects prompt injection and sensitive-data handling, sends suspicious actions
+to a fully simulated Decoy (fake data), and records an explainable Black Box
+timeline. A decoyed fingerprint becomes a Rule that blocks a repeat attack.
 
 The complete product loop is:
 
@@ -16,20 +15,23 @@ Protect → Attack → Observe → Learn → Harden → Re-test
 ```
 
 Bulkhead never executes submitted shell commands, reads host files, calls a
-network, or performs GitHub actions. Demo attacks and HoneyWorld values are
+network, or performs GitHub actions. Demo attacks and Decoy values are
 synthetic.
 
 ## Implemented behavior
 
-- Supported action types: `read_file`, `write_file`, `run_command`,
-  `http_request`, and `github_action`.
-- Decisions: `allow`, `block`, or `quarantine`.
+- Supported action types: Read file, Write file, Run command, Web request, and
+  GitHub action. The API wire values remain `read_file`, `write_file`,
+  `run_command`, `http_request`, and `github_action`.
+- Decisions: Allowed, Blocked, or Decoyed. The API wire values remain `allow`,
+  `block`, and `quarantine`.
 - Deterministic detectors normalize common encodings, Unicode disguises, and
   path spellings before checking prompt injection, sensitive paths/fields,
   secret material, exfiltration, and destructive commands.
-- Quarantine creates an incident, runs the descriptive action against fake
-  HoneyWorld decoys, stores a capture receipt, and generates an immunity rule.
-- Every event, incident, immunity rule, and HoneyWorld capture is persisted by
+- A Decoyed action creates an Attack, runs the descriptive action against fake
+  data, stores a capture receipt, and generates a Rule that blocks a repeat
+  attack.
+- Every event, Attack, Rule, and Decoy capture is persisted by
   the SQLite-backed `EventLedger`.
 
 ## Requirements and clean setup
@@ -63,7 +65,7 @@ never contain real credentials. The running gateway currently consumes the
 | `BULKHEAD_ENV` | `development` | Environment label for local configuration. |
 | `BULKHEAD_HOST` | `127.0.0.1` | Documented local bind host. The run commands pass the host explicitly. |
 | `BULKHEAD_PORT` | `8000` | Documented local bind port. The run commands pass the port explicitly. |
-| `BULKHEAD_DB_PATH` | `./data/bulkhead.db` | SQLite file for events, incidents, immunity rules, and capture receipts. Use `:memory:` for an ephemeral process. |
+| `BULKHEAD_DB_PATH` | `./data/bulkhead.db` | SQLite file for events, Attacks, Rules, and capture receipts. Use `:memory:` for an ephemeral process. |
 | `BULKHEAD_API_KEY` | *(blank)* | Optional API key. When set, evaluation requests require `X-Bulkhead-Key`, `X-API-Key`, or `Authorization: Bearer ...`. |
 | `BULKHEAD_LLM_JUDGE` | `0` | Enables the optional `{risk, rationale}` second check for borderline risk scores (30–69); deterministic policy remains authoritative. |
 | `BULKHEAD_PUBLIC_DEMO` | `0` | Enables isolated two-hour visitor sessions, public request limits, and the Arena/Attack lab sandbox. |
@@ -71,7 +73,7 @@ never contain real credentials. The running gateway currently consumes the
 The default database path is relative to the working directory. SQLite creates
 the parent directory, enables WAL mode for file databases, and reloads the
 four persisted collections when a new `EventLedger` opens the same file.
-HoneyWorld's active decoy filesystem remains process-local; its captured
+The active Decoy filesystem remains process-local; its captured
 receipts are persisted in SQLite.
 
 ## Run locally
@@ -82,6 +84,9 @@ python -m uvicorn app.main:app --host "${BULKHEAD_HOST:-127.0.0.1}" --port "${BU
 ```
 
 Open <http://127.0.0.1:8000> (or the configured host and port).
+
+The local MCP integration exposes the `bulkhead-mcp` console command after the
+project is installed in the active environment.
 
 ## Run with Docker
 
@@ -104,7 +109,7 @@ service listens on Render's `PORT`, uses `/healthz` for health checks, and sets
 `BULKHEAD_PUBLIC_DEMO=1`.
 
 Public mode gives each visitor an expiring, httpOnly session cookie. Events,
-incidents, immunity rules, HoneyWorld receipts, lab scores, and reset operations
+Attacks, Rules, Decoy receipts, lab scores, and reset operations
 stay inside that visitor's in-memory sandbox. Requests are limited to 60 per
 minute per session and per IP, and request bodies are limited to 20 KB. The
 demo only evaluates descriptive actions; it never reads real files, runs shell
@@ -116,18 +121,18 @@ commands, or makes outbound network calls.
 | --- | --- | --- |
 | `GET` | `/health` | Liveness check. |
 | `GET` | `/api/health` | Compatibility liveness check. |
-| `GET` | `/api/state` | Events, incidents, rules, counts, and HoneyWorld state. |
+| `GET` | `/api/state` | Events, Attacks, Rules, counts, and Decoy state. |
 | `GET` | `/api/default-intent` | Canonical zero-trust intent used by the server and dashboard. |
 | `GET` | `/api/stream` | Live `audit_event` decisions and `reset` notifications (SSE). |
 | `GET` | `/api/events` | Black Box events. |
 | `POST` | `/api/evaluate` | Evaluate an action object or flat action fields. |
-| `POST` | `/api/demo` | Reset and run the deterministic `allow → quarantine → block` demo. |
-| `POST` | `/api/reset-demo` | Clear the SQLite-backed demo collections and reset HoneyWorld decoys. |
+| `POST` | `/api/demo` | Reset and run the deterministic Allowed → Decoyed → Blocked demo. |
+| `POST` | `/api/reset-demo` | Clear the SQLite-backed demo collections and reset Decoy data. |
 | `GET` | `/api/attacks` | List the built-in synthetic attack presets. |
-| `GET` | `/api/rules` | List immunity rules. |
-| `PATCH/DELETE` | `/api/rules/{id}` | Toggle or delete an immunity rule. |
+| `GET` | `/api/rules` | List Rules. |
+| `PATCH/DELETE` | `/api/rules/{id}` | Toggle or delete a Rule. |
 
-Resets clear audit data but preserve persistent event, incident, and rule ID
+Resets clear audit data but preserve persistent event, Attack, and Rule ID
 counters. Existing dashboards immediately clear on the SSE `reset` notification,
 then reload `/api/state`; they also reconcile state every three seconds.
 Send `X-Agent-Id` to record the caller in each event's top-level `agent_id` and
@@ -159,7 +164,7 @@ python examples/agent_demo.py
 The example evaluates a safe read and a synthetic malicious webpage, then
 prints the containment and immunity decisions. It uses only simulated tools.
 The dashboard's **Run demo** button presents four steps with **Next**:
-safe read, quarantined attack, repeat blocked by a rule, and disguised repeat
+safe read, decoyed attack, repeat blocked by a Rule, and disguised repeat
 blocked by the same rule. `POST /api/demo` and its aliases retain the original
 three-step API response. See [`docs/demo-script.md`](docs/demo-script.md).
 
@@ -169,14 +174,14 @@ The vanilla HTML/CSS/JavaScript interface has no build step or remote assets.
 It defaults to a light theme; **Dark mode** saves a local preference.
 
 - **Activity:** searchable, filterable decision log; keyboard row navigation;
-  full event drawer; routing diagram; persisted HoneyWorld receipts.
+  full event drawer; routing diagram; persisted Decoy receipts.
 - **Test:** editable intent and action, 15 grouped scenarios, expected/actual
   comparisons, and **Run all scenarios**. Each batch uses a unique synthetic
   content marker so previously learned rules do not spoil repeat test runs.
   Tests create real audit events; they do not clear existing data or disable rules.
 - **Rules:** enable/disable with rollback on error, confirm deletion, inspect
-  fingerprints, and open the originating incident.
-- **Exports:** audit JSON, CSV, rule JSON, incident JSON, and individual Markdown
+  fingerprints, and open the originating Attack.
+- **Exports:** events JSON, CSV, Rules JSON, Attacks JSON, and individual Markdown
   report preview/download.
 
 Use **Ctrl/Cmd+Enter** to evaluate on Test, arrow keys and **Enter** in the log,
@@ -220,7 +225,7 @@ and fails on console errors or page overflow.
 ```text
 app/core/       intent, fingerprints, policy, and deterministic detectors
 app/audit/      SQLite-backed Black Box ledger
-app/honeyworld/ fake decoys and no-op quarantine simulation
+app/honeyworld/ fake Decoy data and no-op simulation
 app/agents/     agent HTTP client and guard helpers
 app/api/        FastAPI routes and request models
 app/static/     local dashboard

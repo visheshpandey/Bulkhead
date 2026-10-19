@@ -66,9 +66,9 @@ test('navigation, filtering, keyboard rows and safe event details', async () => 
   a.elements['log-body'].children[0].fire('keydown', { key: 'Enter' }); await flush();
   assert.equal(a.calls.some((call) => call.url === '/api/events/%3Cnew%3E'), true);
   assert.equal(a.elements['drawer-body'].children[0].textContent.includes('<img src=x>'), false);
-  assert.equal(a.elements['drawer-body'].textContent.includes('quarantined'), true);
+  assert.equal(a.elements['drawer-body'].textContent.includes('Decoyed'), true);
   assert.equal(a.elements['drawer-body'].children.some((child) => child.tagName === 'details'), true);
-  assert.equal(a.elements['drawer-body'].children.some((child) => child.textContent.includes('Copy')), true);
+  assert.equal(a.elements['drawer-body'].children.some((child) => child.textContent.includes('⧉')), true);
   assert.equal(a.elements['event-drawer'].attributes['aria-hidden'], 'false');
   assert.equal(a.document.shell.inert, true);
   a.fireKey({ key: 'Escape' }); assert.equal(a.elements['event-drawer'].hidden, true);
@@ -104,8 +104,8 @@ test('Arena rate limits show the replay message and preserve earlier rows', asyn
   a.elements['arena-watch'].fire('click'); await flush();
   assert.equal(a.elements['arena-error'].textContent, 'Too many requests — wait a few seconds and press Replay');
   assert.equal(a.elements['arena-error'].className.includes('rate-limit'), true);
-  assert.equal(a.elements['arena-with-steps'].children[0].textContent.includes('OK'), true);
-  assert.equal(a.elements['arena-with-steps'].children[1].textContent.includes('Caught'), true);
+  assert.equal(a.elements['arena-with-steps'].children[0].textContent.includes('Allowed'), true);
+  assert.equal(a.elements['arena-with-steps'].children[1].textContent.includes('Decoyed'), true);
   assert.equal(a.elements['arena-with-steps'].children[2].textContent.includes('Error'), false);
 });
 
@@ -216,10 +216,10 @@ test('reset during a pending guided step rejects its stale decision', async () =
 test('finding-based language and durable capture count never display server flavour', async () => {
   const unsafe = { ...event('unsafe', 'quarantine'), reason: '<raw server flavour>', findings: [{ label: 'secret_to_network', severity: 95, evidence: '<untrusted>' }] };
   const a = boot({ initial: snapshot([unsafe], [], [], [{ action_type: 'read_file', target: '/workspace/.env' }]) }); await flush();
-  assert.equal(a.elements['latest-reason'].textContent.includes('Sensitive data was directed'), true);
+  assert.equal(a.elements['latest-reason'].textContent.includes('Sending data to an unknown site is not allowed.'), true);
   assert.equal(a.elements['latest-reason'].textContent.includes('<raw server flavour>'), false);
   assert.equal(a.elements['finding-list'].textContent.includes('Sensitive data was directed'), true);
-  assert.equal(a.elements['honey-summary'].textContent.startsWith('1 action captured.'), true);
+  assert.equal(a.elements['honey-summary'].textContent.startsWith('1 attack sent to the decoy.'), true);
 });
 
 test('rule rollback and confirmed delete refresh authoritative state', async () => {
