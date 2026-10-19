@@ -11,13 +11,16 @@ LABEL org.opencontainers.image.title="Bulkhead"
 COPY requirements.lock ./
 RUN python -m pip install --no-cache-dir --requirement requirements.lock
 
+COPY app ./app
+COPY pyproject.toml ./
+RUN python -m pip install --no-cache-dir --no-deps --no-build-isolation --editable .
+
 RUN addgroup --system bulkhead && adduser --system --ingroup bulkhead bulkhead
 
-COPY app ./app
 COPY tests ./tests
 COPY docs ./docs
 COPY examples ./examples
-COPY README.md pyproject.toml .env.example ./
+COPY README.md .env.example ./
 
 RUN mkdir -p /app/data && chown -R bulkhead:bulkhead /app
 USER bulkhead

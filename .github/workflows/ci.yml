@@ -22,6 +22,9 @@ jobs:
       - name: Install locked dependencies
         run: python -m pip install --requirement requirements.lock
 
+      - name: Install Bulkhead package and console scripts
+        run: python -m pip install --no-deps --no-build-isolation --editable .
+
       - name: Set up Node for offline dashboard behavior tests
         uses: actions/setup-node@v4
         with:

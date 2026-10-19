@@ -1,24 +1,69 @@
-# Bulkhead
+# Bulkhead — stop the tool call before it becomes an incident
 
-## A self-defending gateway for AI-agent actions
+Bulkhead is a local, zero-trust policy gateway for AI agents. It evaluates
+every proposed tool call against user intent, catches prompt injection and
+sensitive-data handling, sends suspicious actions to a synthetic Decoy, and
+keeps an explainable Black Box timeline.
 
-Bulkhead is a local, zero-trust gateway that evaluates an agent's proposed tool
-call before the tool is invoked. It compares the action with user intent,
-detects prompt injection and sensitive-data handling, sends suspicious actions
-to a fully simulated Decoy (fake data), and records an explainable Black Box
-timeline. A decoyed fingerprint becomes a Rule that blocks a repeat attack.
+> **Live demo:** `https://your-live-demo-url.example` *(replace with the deployed URL)*
+
+![Bulkhead demo](docs/demo.gif)
+
+## Run it locally
+
+```bash
+git clone <repository-url>
+cd <repository-directory>
+python3.11 -m venv .venv
+source .venv/bin/activate
+python -m pip install --requirement requirements.lock
+python -m pip install --no-deps --no-build-isolation --editable .
+cp .env.example .env
+python -m uvicorn app.main:app --host 127.0.0.1 --port 8000
+```
+
+Open <http://127.0.0.1:8000>. The dashboard is safe to demo: it never reads
+host files, runs submitted shell commands, calls an external network, or
+performs GitHub actions. All attacks and Decoy values are synthetic.
+
+## How it works
+
+```text
+Protect → Attack → Observe → Learn → Harden → Re-test
+```
+
+Bulkhead checks the descriptive action before the agent invokes a tool. A
+safe action is Allowed, a dangerous action is Blocked, and a suspicious action
+is Decoyed with fake data. A Decoyed fingerprint becomes a learned Rule that
+blocks the same attack on replay.
+
+## Add it to an agent
+
+- **MCP:** install the project locally, then configure `{ "command": "bulkhead-mcp" }`.
+- **Coding-agent hook:** run `python examples/hooks/pretooluse.py < action.json` before a tool call.
+- **Python:** use `BulkheadClient` and `@bulkhead_guard` from `app.agents`.
+
+The full copy-ready snippets are in the dashboard's **Add to your agent** page.
+
+## Test and deploy
+
+```bash
+make test
+docker build --tag bulkhead:local .
+docker run --rm --publish 8000:8000 bulkhead:local
+```
+
+For a public demo, create the included Render Blueprint from `render.yaml` and
+set `BULKHEAD_PUBLIC_DEMO=1`. Public mode gives each visitor an isolated,
+expiring in-memory session with request limits.
+
+## Implemented behavior
 
 The complete product loop is:
 
 ```text
 Protect → Attack → Observe → Learn → Harden → Re-test
 ```
-
-Bulkhead never executes submitted shell commands, reads host files, calls a
-network, or performs GitHub actions. Demo attacks and Decoy values are
-synthetic.
-
-## Implemented behavior
 
 - Supported action types: Read file, Write file, Run command, Web request, and
   GitHub action. The API wire values remain `read_file`, `write_file`,

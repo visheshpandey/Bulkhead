@@ -125,7 +125,7 @@ def bulkhead_guard(
                 intent=intent,
             )
             if not result.get("allowed", result.get("decision") == "allow"):
-                raise PermissionError(result.get("reason", "Bulkhead blocked the tool call"))
+                raise BulkheadBlocked(result)
             return function(*args, **kwargs)
 
         return wrapped

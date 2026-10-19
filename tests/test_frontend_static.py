@@ -141,6 +141,18 @@ def test_arena_final_polish_contracts_are_present() -> None:
     assert "arenaReplayDone" in script
 
 
+def test_mobile_menu_demo_note_and_integration_snippets_are_present() -> None:
+    html = (STATIC / "index.html").read_text(encoding="utf-8")
+    css = (STATIC / "enhance.css").read_text(encoding="utf-8")
+    assert 'class="menu-label">Menu</span>' in html
+    assert ".main-nav > a { display: none; }" in css
+    assert "Simulated demo. No real passwords, files or network calls are used." in html
+    assert '"command": "bulkhead-mcp"' in html
+    assert "python examples/hooks/pretooluse.py &lt; action.json" in html
+    assert "python -m pip install --editable ." in html
+    assert "@bulkhead_guard" in html
+
+
 def test_frontend_form_errors_and_table_layout_contracts_are_explicit() -> None:
     html = (STATIC / "index.html").read_text(encoding="utf-8")
     css = (STATIC / "styles.css").read_text(encoding="utf-8")

@@ -73,18 +73,26 @@ def exercise(page, output: Path, arena_statuses: list[int]) -> None:
         expect(page.locator("#arena-with-steps .arena-step")).to_have_count(4)
         expect(page.locator("#arena-replay-result")).to_be_visible()
 
-    page.locator('[data-page="lab"]').click()
+    page.locator('.main-nav > a[data-page="lab"]').click()
     page.locator('[data-sample="comment"]').click()
     page.locator("#lab-run").click()
     expect(page.locator("#lab-status")).to_contain_text("Blocked", timeout=10000)
 
-    for width in (1440, 1024, 375):
-        page.set_viewport_size({"width": width, "height": 1000 if width > 400 else 812})
-        for name in ("arena", "lab", "integrate"):
+    screenshots = ROOT / "docs" / "screenshots"
+    screenshots.mkdir(parents=True, exist_ok=True)
+    for width in (1280, 768, 414, 375):
+        height = 1000 if width > 768 else 896 if width > 400 else 812
+        page.set_viewport_size({"width": width, "height": height})
+        names = ("arena", "lab", "integrate", "activity", "rules", "test", "exports")
+        for name in names:
             page.evaluate("name => { location.hash = '#' + name; }", name)
             expect(page.locator(f"#page-{name}")).to_be_visible()
             check_layout(page)
             page.screenshot(path=str(output / f"{name}-{width}.png"), full_page=True)
+            if name == "arena" and width in (1280, 768, 375):
+                page.screenshot(path=str(screenshots / f"arena-{width}.png"), full_page=True)
+        if width == 375:
+            expect(page.locator(".menu-label")).to_be_visible()
         page.evaluate("location.hash = '#arena'")
         expect(page.locator("#page-arena")).to_be_visible()
         page.locator("#theme-toggle").click()
@@ -147,10 +155,27 @@ def main() -> None:
             page.on("response", lambda response: arena_statuses.append(response.status) if "/api/evaluate" in response.url else None)
             page.goto("/", wait_until="domcontentloaded")
             exercise(page, output, arena_statuses)
+            health = page.request.get("/healthz")
+            assert health.status == 200 and health.json() == {"status": "ok", "service": "bulkhead"}
+            if os.environ.get("BULKHEAD_PUBLIC_DEMO") == "1":
+                first_state = page.evaluate("fetch('/api/state').then(response => response.json())")
+                isolated_context = browser.new_context(
+                    base_url=f"http://127.0.0.1:{port}", viewport={"width": 1280, "height": 1000}
+                )
+                isolated_page = isolated_context.new_page()
+                isolated_page.goto("/", wait_until="networkidle")
+                isolated_state = isolated_page.evaluate("fetch('/api/state').then(response => response.json())")
+                assert isolated_state["events"] == []
+                isolated_page.locator("#arena-speed").select_option("2")
+                isolated_page.locator("#arena-watch").click()
+                expect(isolated_page.locator("#arena-finish")).to_be_visible(timeout=30000)
+                current_state = page.evaluate("fetch('/api/state').then(response => response.json())")
+                assert len(first_state["events"]) == len(current_state["events"])
+                isolated_context.close()
             assert not errors, errors
             browser.close()
         print("Browser checks passed: three Arena plays with five 200 responses each, lab, and responsive pages.")
-        print("No console errors or page overflow at 1440, 1024, or 375px. Screenshots: artifacts/frontend/")
+        print("No console errors or page overflow at 1280, 768, 414, or 375px. Screenshots: docs/screenshots/")
     finally:
         server.should_exit = True
         thread.join(timeout=5)

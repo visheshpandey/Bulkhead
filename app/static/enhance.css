@@ -104,6 +104,8 @@ main { padding: 28px 0 64px; }
 body:has(#page-arena.active) #run-demo-button { display: none; }
 .more-menu summary { padding: 8px 10px; border-radius: 9px; font-weight: 650; }
 .more-menu summary:hover, .more-menu[open] summary { color: var(--accent); background: var(--accent-tint); }
+.menu-label { display: none; }
+.mobile-only-link { display: none; }
 .more-menu > div { top: 42px; min-width: 180px; padding: 6px; border: 1px solid var(--line); border-radius: 12px; box-shadow: none; }
 .more-menu > div a { border-radius: 8px; padding: 9px 11px; }
 .more-menu > div a:hover { background: var(--accent-tint); color: var(--accent); }
@@ -414,6 +416,27 @@ html[data-theme="dark"] #page-integrate .code-head h2::before { box-shadow: none
   #page-lab .lab-score strong span { font-size: 31px; }
   #page-integrate .integrate-tabs { overflow-x: auto; }
   #page-integrate .integrate-tabs .button { min-width: 150px; }
+  .main-nav > a { display: none; }
+  .main-nav { overflow: visible; }
+  .more-menu .more-label { display: none; }
+  .more-menu .menu-label { display: inline; }
+  .more-menu .mobile-only-link { display: block; }
+}
+
+@media (max-width: 899px) {
+  html, body { max-width: 100%; overflow-x: hidden; }
+  .app-shell, main, .app-page, .topbar, .header-actions, .main-nav { min-width: 0; max-width: 100%; }
+  .main-nav { overflow-x: auto; }
+  .header-actions { flex-wrap: wrap; }
+  .data-table { min-width: max-content; }
+  .table-scroll { max-width: 100%; overflow-x: auto; }
+  .button { min-height: 40px; }
+}
+
+@media (min-width: 681px) and (max-width: 899px) {
+  .topbar { flex-wrap: nowrap; }
+  .main-nav { flex: 1 1 auto; min-width: 0; }
+  .header-actions { flex: 0 1 auto; min-width: 0; }
 }
 
 @media (prefers-reduced-motion: reduce) {
