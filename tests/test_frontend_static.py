@@ -153,6 +153,23 @@ def test_mobile_menu_demo_note_and_integration_snippets_are_present() -> None:
     assert "@bulkhead_guard" in html
 
 
+def test_coding_agent_hook_snippets_match_the_real_hook() -> None:
+    html = (STATIC / "index.html").read_text(encoding="utf-8")
+    hook = (ROOT / "examples" / "hooks" / "pretooluse.py").read_text(encoding="utf-8")
+    config = re.search(r'<pre id="hook-config-code">(.*?)</pre>', html, re.DOTALL)
+    action = re.search(r'<pre id="action-json-code">(.*?)</pre>', html, re.DOTALL)
+    assert config and action
+    assert "examples/hooks/pretooluse.py" in config.group(1)
+    assert '"matcher": ""' in config.group(1)
+    assert action.group(1).count("\n") == 4
+    assert json.loads(action.group(1)) == {
+        "action_type": "read_file", "target": "/workspace/.env", "payload": {}
+    }
+    assert 'json.load(sys.stdin)' in hook
+    assert 'return 1' in hook
+    assert "Exit code 0 = allowed; non-zero = blocked or decoyed, with the reason printed." in html
+
+
 def test_frontend_form_errors_and_table_layout_contracts_are_explicit() -> None:
     html = (STATIC / "index.html").read_text(encoding="utf-8")
     css = (STATIC / "styles.css").read_text(encoding="utf-8")

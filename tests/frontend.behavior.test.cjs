@@ -90,6 +90,27 @@ test('Arena sends only AgentAction fields inside action', async () => {
   assert.equal(replay.action.content.includes('ignore previous instructions'), true);
 });
 
+test('rapid double Play starts one clean Arena run', async () => {
+  const a = boot(); await flush();
+  const decisions = ['allow', 'quarantine', 'block', 'allow', 'block'];
+  decisions.forEach((decision, index) => a.queue('/api/evaluate', {
+    decision,
+    event: event(`double-${index}`, decision),
+    ...(decision === 'quarantine' ? { immunity_rule: { id: 'rule-double', enabled: true } } : {}),
+  }));
+  a.elements['arena-watch'].fire('click');
+  a.elements['arena-watch'].fire('click');
+  assert.equal(a.elements['arena-watch'].disabled, true);
+  await flush();
+  assert.equal(a.calls.filter((call) => call.url === '/api/reset-demo').length, 1);
+  assert.equal(a.calls.filter((call) => call.url === '/api/evaluate').length, 5);
+  assert.equal(a.elements['event-count'].textContent, '5 events');
+  assert.equal(a.elements['rule-count'].textContent, '1 rule');
+  assert.equal(a.elements['arena-error'].hidden, true);
+  assert.equal(a.elements['arena-finish'].hidden, false);
+  assert.equal(a.elements['arena-watch'].disabled, false);
+});
+
 test('three Arena plays complete with five successful evaluations each', async () => {
   const a = boot(); await flush();
   for (let play = 0; play < 3; play++) { a.elements['arena-watch'].fire('click'); await flush(); assert.equal(a.elements['arena-error'].hidden, true); assert.equal(a.elements['arena-finish'].hidden, false); }

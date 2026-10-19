@@ -53,7 +53,7 @@ def _run_hook(decision: str, payload: dict) -> tuple[subprocess.CompletedProcess
 
 
 def test_hook_command_sends_json_and_returns_nonzero_for_decoyed_action() -> None:
-    payload = {"action": {"action_type": "read_file", "target": "/workspace/.env"}}
+    payload = {"action_type": "read_file", "target": "/workspace/.env", "payload": {}}
     allowed, server = _run_hook("allow", payload)
     try:
         assert allowed.returncode == 0, allowed.stderr

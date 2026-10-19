@@ -65,7 +65,18 @@
   "mcpServers": {
     "bulkhead": { "command": "bulkhead-mcp" }
   }
-  }</pre></div><div class="integrate-pane" data-integrate-pane="hook" hidden><div class="code-head"><h2>Pre-tool hook</h2><button class="text-button" data-copy-code="hook-code" type="button">Copy</button></div><p class="meta">Checks each pre-tool action before it runs.</p><pre id="hook-code">python examples/hooks/pretooluse.py &lt; action.json</pre><p class="meta">The hook sends the descriptive call to <code>/api/evaluate</code> and exits non-zero for blocked or decoyed actions.</p></div><div class="integrate-pane" data-integrate-pane="python" hidden><div class="code-head"><h2>Python decorator</h2><button class="text-button" data-copy-code="python-code" type="button">Copy</button></div><p class="meta">Wraps descriptive actions with Bulkhead checks.</p><pre id="python-code">python -m pip install --editable .
+  }</pre></div><div class="integrate-pane" data-integrate-pane="hook" hidden><div class="code-head"><h2>Pre-tool hook</h2><button class="text-button" data-copy-code="hook-code" type="button">Copy</button></div><p class="meta">Checks each pre-tool action before it runs.</p><pre id="hook-code">python examples/hooks/pretooluse.py &lt; action.json</pre><div class="code-head"><h3>Hook configuration</h3><button class="text-button" data-copy-code="hook-config-code" type="button">Copy</button></div><pre id="hook-config-code">{
+  "hooks": {
+    "PreToolUse": [{
+      "matcher": "",
+      "hooks": [{ "type": "command", "command": "python examples/hooks/pretooluse.py" }]
+    }]
+  }
+}</pre><div class="code-head"><h3>Example action.json</h3><button class="text-button" data-copy-code="action-json-code" type="button">Copy</button></div><pre id="action-json-code">{
+  "action_type": "read_file",
+  "target": "/workspace/.env",
+  "payload": {}
+}</pre><p class="meta">Exit code 0 = allowed; non-zero = blocked or decoyed, with the reason printed.</p></div><div class="integrate-pane" data-integrate-pane="python" hidden><div class="code-head"><h2>Python decorator</h2><button class="text-button" data-copy-code="python-code" type="button">Copy</button></div><p class="meta">Wraps descriptive actions with Bulkhead checks.</p><pre id="python-code">python -m pip install --editable .
 
 from app.agents import BulkheadClient, bulkhead_guard
 
