@@ -60,6 +60,16 @@ def check_plain_visual_contract(page) -> None:
     assert effects == [], effects[:10]
 
 
+def check_arena_subtitle(page) -> None:
+    subtitle = page.evaluate("""() => {
+      const element = document.querySelector('#page-arena .arena-subtitle');
+      const style = getComputedStyle(element);
+      return { display: style.display, fontSize: style.fontSize, height: element.getBoundingClientRect().height };
+    }""")
+    assert subtitle["display"] != "none" and subtitle["height"] > 0, subtitle
+    assert subtitle["fontSize"] == "13px", subtitle
+
+
 def exercise(page, output: Path, arena_statuses: list[int], *, public: bool = False) -> None:
     expect(page.locator("#connection-label")).to_have_text("Connected")
     assert page.locator("html").get_attribute("data-theme") == "light"
@@ -91,6 +101,8 @@ def exercise(page, output: Path, arena_statuses: list[int], *, public: bool = Fa
             page.evaluate("name => { location.hash = '#' + name; }", name)
             expect(page.locator(f"#page-{name}")).to_be_visible()
             check_layout(page)
+            if name == "arena":
+                check_arena_subtitle(page)
             page.screenshot(path=str(output / f"{name}-{width}.png"), full_page=True)
             if name == "arena" and width in (1280, 768, 375):
                 page.screenshot(path=str(screenshots / f"arena-{width}.png"), full_page=True)
@@ -110,6 +122,7 @@ def exercise(page, output: Path, arena_statuses: list[int], *, public: bool = Fa
         expect(page.locator("#page-arena")).to_be_visible()
         expect(page.locator("#connection-label")).to_have_text("Connected")
         check_plain_visual_contract(page)
+        check_arena_subtitle(page)
         check_layout(page)
         assert page.evaluate("document.documentElement.scrollHeight") <= height
         page.locator("#arena-speed").select_option("2")
