@@ -1,11 +1,20 @@
 # Bulkhead — stop the tool call before it becomes an incident
 
+[![CI](https://github.com/visheshpandey/Bulkhead/actions/workflows/ci.yml/badge.svg)](https://github.com/visheshpandey/Bulkhead/actions/workflows/ci.yml)
+[![Coverage](https://img.shields.io/badge/coverage-CI%20enforced-blue.svg)](.github/workflows/ci.yml)
+[![Python](https://img.shields.io/badge/python-3.11%2B-3776AB.svg)](https://www.python.org/)
+[![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+
 Bulkhead is a local, zero-trust policy gateway for AI agents. It evaluates
 every proposed tool call against user intent, catches prompt injection and
 sensitive-data handling, sends suspicious actions to a synthetic Decoy, and
 keeps an explainable Black Box timeline.
 
 ![Bulkhead demo](docs/demo.gif)
+
+**Live demo:** [run the isolated demo locally](#run-locally). A hosted demo is
+not assumed by the repository; `render.yaml` contains the reproducible deploy
+definition.
 
 ## Clean Linux setup
 
@@ -20,15 +29,18 @@ python -m pip install --no-deps --no-build-isolation --editable .
 cp .env.example .env
 ```
 
-The project requires exactly Python **3.11.9**, as pinned in `.python-version`,
-the Dockerfile, CI, and package metadata. Dependencies are installed from the
-committed `requirements.lock`; the editable install provides the `bulkhead-mcp`
-console command. No global packages or secrets are required.
+The package supports Python **3.11 or newer**. The reproducible baseline is
+Python **3.11.9**, pinned in `.python-version`, Docker, and CI. Dependencies
+are installed from `requirements.lock`; the editable install provides the
+`bulkhead-mcp` console command. No global packages or secrets are required.
+Install Python 3.11.9 with your preferred local version manager before these
+commands; `python --version` should report `Python 3.11.9`.
 
 ## Run locally
 
 ```bash
 source .venv/bin/activate
+set -a; . ./.env; set +a
 python -m uvicorn app.main:app --host "${BULKHEAD_HOST:-127.0.0.1}" --port "${BULKHEAD_PORT:-8000}"
 ```
 
@@ -65,6 +77,10 @@ python -m pytest
 Python suite; when Node.js 22.14.0 is available, the frontend behavior test is
 also run by the suite. `make test` is a convenience alias. Ruff is the separate
 lint check used by CI.
+
+Run the frontend suite directly with `npm ci && npm test`. `make type` runs
+Mypy, and the optional browser layout/interaction check is
+`make accessibility` after provisioning Chromium as described below.
 
 ## Build and run with Docker
 
@@ -117,6 +133,8 @@ values in `.env.example` are safe local defaults; `.env` is ignored and must
 never contain real credentials. The running gateway currently consumes the
 `BULKHEAD_*` variables; the host/port values are passed by the run commands and
 `BULKHEAD_LLM_JUDGE` reserves the optional judge integration flag.
+The application does not load `.env` itself; source the file into your shell
+before starting Uvicorn, as in the local run command above.
 
 | Variable | Example | Purpose |
 | --- | --- | --- |
@@ -142,6 +160,9 @@ demo only evaluates descriptive actions; it never reads real files, runs shell
 commands, or makes outbound network calls.
 
 ## API quick reference
+
+See [`docs/API.md`](docs/API.md) for endpoint details and the live generated
+schema at `/openapi.json`.
 
 | Method | Endpoint | Use |
 | --- | --- | --- |
@@ -221,9 +242,11 @@ ruff check .
 python -m pytest
 ```
 
-GitHub Actions uses Python 3.11.9 and the Node version pinned in `.nvmrc`, installs
-`requirements.lock`, then runs `ruff check .` and the same `python -m pytest` command.
-The checks are offline after dependency installation.
+GitHub Actions uses Python 3.11.9 and the Node version pinned in `.nvmrc`,
+installs `requirements.lock`, and runs lint, type, Python tests, frontend,
+browser layout/interaction, static accessibility smoke, and Docker checks.
+The checks are offline after
+dependency installation.
 
 With Node.js available, pytest also runs the dependency-free dashboard behavior
 tests; they can be run directly with `node --test tests/frontend.behavior.test.cjs`.
@@ -264,6 +287,37 @@ data/           ignored SQLite runtime data
 See [`docs/architecture.md`](docs/architecture.md) for the exact evaluation
 pipeline and [`docs/demo-script.md`](docs/demo-script.md) for a reproducible
 walkthrough.
+
+## Stack and entry points
+
+| Layer | Technology |
+| --- | --- |
+| Runtime | Python 3.11+, FastAPI, Pydantic v2, Uvicorn, SQLite |
+| Dashboard | Vanilla JavaScript (ES modules), HTML, CSS |
+| Quality | pytest, Ruff, Mypy, axe-core via Playwright |
+| Delivery | Docker, GitHub Actions, MCP |
+
+Entry points:
+
+- **Server:** `bulkhead-server` or `python -m uvicorn app.main:app` (`app.main:app`).
+- **MCP server:** `bulkhead-mcp` (`app.agents.mcp_server:main`).
+- **Hook:** `python examples/hooks/pretooluse.py < action.json`.
+- **Python guard:** `BulkheadClient` and `bulkhead_guard` from `app.agents`.
+- **CLI demo:** `python examples/agent_demo.py`.
+
+Configuration uses `BULKHEAD_*` variables in [`.env.example`](.env.example)
+and the environment table above.
+
+See [features](docs/FEATURES.md), [architecture](docs/ARCHITECTURE.md),
+[API](docs/API.md), and [security](docs/SECURITY.md) for focused references.
+
+## Limitations
+
+Bulkhead evaluates descriptive actions; it does not execute tools, read host
+files, run commands, or make outbound requests. The Decoy and attack library
+are synthetic. SQLite is the default ledger, while active Decoy files and
+public-demo sessions/rate limits are process-local. Durable multi-process
+storage and centralized identity are outside this demo gateway.
 
 ## Safety boundary
 

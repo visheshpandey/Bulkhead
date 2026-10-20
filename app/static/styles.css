@@ -44,6 +44,8 @@ button, input, select, textarea { font: inherit; }
 button { cursor: pointer; }
 button:disabled { cursor: not-allowed; opacity: .55; }
 :is(a, button, input, select, textarea, summary, tr[tabindex]):focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.skip-link { position: fixed; z-index: 20; top: 8px; left: 8px; transform: translateY(-140%); padding: 8px 12px; border: 1px solid var(--accent); background: var(--panel); color: var(--text); }
+.skip-link:focus { transform: translateY(0); }
 [hidden], .hidden { display: none !important; }
 h1, h2, h3, p { margin-top: 0; }
 h1 { margin-bottom: 3px; font-size: 22px; line-height: 1.3; font-weight: 600; letter-spacing: -.025em; }

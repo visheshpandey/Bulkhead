@@ -1,3 +1,5 @@
+import pytest
+
 from app.audit.ledger import EventLedger
 from app.core.models import ActionType, AgentAction, Decision, ThreatCategory, ThreatFinding
 
@@ -115,4 +117,24 @@ def test_existing_ledger_ids_migrate_to_persistent_counters(tmp_path) -> None:
     incident = ledger.record_incident(action, [], event.id, "fresh")
     rule = ledger.generate_immunity_rule(incident, "fresh")
     assert (event.id, incident.id, rule.id) == ("evt-0004", "inc-0004", "immune-0004")
+    ledger.close()
+
+
+def test_ledger_collections_support_parameterized_pagination(tmp_path) -> None:
+    ledger = EventLedger(str(tmp_path / "pages.db"))
+    action = AgentAction(action_type=ActionType.READ_FILE, target="/workspace/a")
+    for index in range(3):
+        ledger.record_event(
+            action=action,
+            decision=Decision.ALLOW,
+            reason=str(index),
+            risk_score=0,
+            findings=[],
+        )
+
+    assert [event.reason for event in ledger.events(limit=2)] == ["0", "1"]
+    assert [event.reason for event in ledger.events(limit=2, offset=2)] == ["2"]
+    assert [event.reason for event in ledger.events()] == ["0", "1", "2"]
+    with pytest.raises(ValueError):
+        ledger.events(limit=0)
     ledger.close()

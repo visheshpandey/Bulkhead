@@ -9,12 +9,18 @@ import posixpath
 import re
 import unicodedata
 from collections.abc import Iterator
-from typing import Any
+from re import Pattern
+from typing import Any, ClassVar
 from urllib.parse import unquote
 
 from .models import AgentAction, ThreatCategory, ThreatFinding
 
 _ZERO_WIDTH = dict.fromkeys(map(ord, "\u00ad\u034f\u061c\u115f\u1160\u17b4\u17b5\u180b\u180c\u180d\u180e\u200b\u200c\u200d\u200e\u200f\u202a\u202b\u202c\u202d\u202e\u2060\u2061\u2062\u2063\u2064\u2066\u2067\u2068\u2069\u206a\u206b\u206c\u206d\u206e\u206f\u206a\u206b\u206c\u206d\u206e\u206f\ufeff"))
+_ESCAPE_PATTERN = re.compile(r"\\u([0-9a-fA-F]{4})|\\x([0-9a-fA-F]{2})")
+_SEPARATOR_PATTERN = re.compile(r"[^a-z0-9]+")
+_BASE64_PATTERN = re.compile(r"(?<![A-Za-z0-9+/])[A-Za-z0-9+/]{16,}={0,2}(?![A-Za-z0-9+/])")
+_HEX_PATTERN = re.compile(r"(?<![0-9a-fA-F])(?:[0-9a-fA-F]{2}){8,}(?![0-9a-fA-F])")
+_DECODE_ROUNDS = 2
 
 # A small, intentional confusable map catches common Cyrillic/Greek substitutions
 # without trying to transliterate arbitrary user content.
@@ -56,17 +62,13 @@ def normalize_detection_text(value: str) -> str:
     if not isinstance(value, str):
         raise TypeError("detection text must be a string")
     text = value
-    for _ in range(2):
+    for _ in range(_DECODE_ROUNDS):
         text = html.unescape(unquote(text))
-        text = re.sub(
-            r"\\u([0-9a-fA-F]{4})|\\x([0-9a-fA-F]{2})",
-            lambda match: chr(int(match.group(1) or match.group(2), 16)),
-            text,
-        )
+        text = _ESCAPE_PATTERN.sub(lambda match: chr(int(match.group(1) or match.group(2), 16)), text)
     text = unicodedata.normalize("NFKC", text).translate(_CONFUSABLES).translate(_ZERO_WIDTH)
-    text = text.translate(str.maketrans({"0": "o", "1": "i", "3": "e", "4": "a", "5": "s", "7": "t", "@": "a", "$": "s"}))
+    text = text.translate(str.maketrans("013457@$", "oieast as".replace(" ", "")))
     text = text.casefold()
-    return re.sub(r"[^a-z0-9]+", " ", text).strip()
+    return _SEPARATOR_PATTERN.sub(" ", text).strip()
 
 
 normalize_text = normalize_detection_text
@@ -75,13 +77,9 @@ normalize_text = normalize_detection_text
 def _decode_common_text(value: str) -> str:
     """Decode transport escapes while retaining punctuation for path/shell rules."""
     text = value
-    for _ in range(2):
+    for _ in range(_DECODE_ROUNDS):
         text = html.unescape(unquote(text))
-        text = re.sub(
-            r"\\u([0-9a-fA-F]{4})|\\x([0-9a-fA-F]{2})",
-            lambda match: chr(int(match.group(1) or match.group(2), 16)),
-            text,
-        )
+        text = _ESCAPE_PATTERN.sub(lambda match: chr(int(match.group(1) or match.group(2), 16)), text)
     return unicodedata.normalize("NFKC", text).translate(_CONFUSABLES).translate(_ZERO_WIDTH)
 
 
@@ -101,7 +99,7 @@ def _iter_values(value: Any, path: str) -> Iterator[tuple[str, str]]:
 def _decoded_base64_text(values: Iterator[tuple[str, str]]) -> str:
     decoded: list[str] = []
     for _, value in values:
-        for token in re.findall(r"(?<![A-Za-z0-9+/])[A-Za-z0-9+/]{16,}={0,2}(?![A-Za-z0-9+/])", value):
+        for token in _BASE64_PATTERN.findall(value):
             try:
                 raw = base64.b64decode(token, validate=True)
                 text = raw.decode("utf-8")
@@ -115,7 +113,7 @@ def _decoded_base64_text(values: Iterator[tuple[str, str]]) -> str:
 def _decoded_hex_text(values: Iterator[tuple[str, str]]) -> str:
     decoded: list[str] = []
     for _, value in values:
-        for token in re.findall(r"(?<![0-9a-fA-F])(?:[0-9a-fA-F]{2}){8,}(?![0-9a-fA-F])", value):
+        for token in _HEX_PATTERN.findall(value):
             try:
                 text = bytes.fromhex(token).decode("utf-8")
             except (ValueError, UnicodeDecodeError):
@@ -128,28 +126,37 @@ def _decoded_hex_text(values: Iterator[tuple[str, str]]) -> str:
 class ThreatDetector:
     """Detect prompt injection, sensitive-data handling, and dangerous shell use."""
 
-    _injection_patterns = (
-        ("ignore_previous_instructions", r"\bignore\s+(?:all\s+)?(?:previous|prior|earlier)\s+instructions?\b"),
-        ("disregard_previous_instructions", r"\bdisregard\s+(?:all\s+)?(?:previous|prior|earlier)\s+instructions?\b"),
-        ("override_system_prompt", r"\b(?:override|reveal|show|print)\s+(?:the\s+)?(?:system|developer)\s+(?:prompt|message|instructions?)\b"),
-        ("jailbreak_request", r"\b(?:jailbreak|dan\s+mode|developer\s+mode)\b"),
-        ("untrusted_page_instruction", r"\b(?:webpage|page|document)\s+(?:says|instructs?|tells?)\s+you\b"),
+    _injection_patterns: ClassVar[tuple[tuple[str, Pattern[str]], ...]] = tuple(
+        (label, re.compile(pattern, re.IGNORECASE))
+        for label, pattern in (
+            ("ignore_previous_instructions", r"\bignore\s+(?:all\s+)?(?:previous|prior|earlier)\s+instructions?\b"),
+            ("disregard_previous_instructions", r"\bdisregard\s+(?:all\s+)?(?:previous|prior|earlier)\s+instructions?\b"),
+            ("override_system_prompt", r"\b(?:override|reveal|show|print)\s+(?:the\s+)?(?:system|developer)\s+(?:prompt|message|instructions?)\b"),
+            ("jailbreak_request", r"\b(?:jailbreak|dan\s+mode|developer\s+mode)\b"),
+            ("untrusted_page_instruction", r"\b(?:webpage|page|document)\s+(?:says|instructs?|tells?)\s+you\b"),
+        )
     )
-    _secret_path_patterns = (
-        ("dotenv_access", r"(?:^|[\s/])\.env(?:$|[\s/?#])"),
-        ("private_key_access", r"(?:id[_ -]?rsa|id[_ -]?ed25519|private[_ -]?key|begin\s+(?:rsa\s+)?private\s+key)"),
-        ("credential_path_access", r"(?:\.ssh|\.aws/credentials|kubeconfig|credentials?\.json|[^\s/]+\.pem)"),
+    _secret_path_patterns: ClassVar[tuple[tuple[str, Pattern[str]], ...]] = tuple(
+        (label, re.compile(pattern, re.IGNORECASE))
+        for label, pattern in (
+            ("dotenv_access", r"(?:^|[\s/])\.env(?:$|[\s/?#])"),
+            ("private_key_access", r"(?:id[_ -]?rsa|id[_ -]?ed25519|private[_ -]?key|begin\s+(?:rsa\s+)?private\s+key)"),
+            ("credential_path_access", r"(?:\.ssh|\.aws/credentials|kubeconfig|credentials?\.json|[^\s/]+\.pem)"),
+        )
     )
-    _secret_field_pattern = re.compile(
+    _secret_field_pattern: ClassVar[Pattern[str]] = re.compile(
         r"(?:^|[._\[ -])(?:api[_ -]?key|apikey|access[_ -]?(?:token|key)|auth[_ -]?token|password|passwd|secret|token|authorization|credential|private[_ -]?key)(?:$|[._\] -])",
         re.IGNORECASE,
     )
-    _secret_material_patterns = (
-        r"-----begin\s+(?:rsa\s+)?private\s+key-----",
-        r"\b(?:sk-[a-z0-9]{10,}|ghp_[a-z0-9]{20,}|github_pat_[a-z0-9_]+|AKIA[0-9A-Z]{16}|xox[baprs]-[a-z0-9-]+)\b",
-        r"\beyJ[a-z0-9_-]+\.eyJ[a-z0-9_-]+\.[a-z0-9_-]+\b",
-        r"\b(?:bearer|basic)\s+[a-z0-9+/=_-]{12,}",
-        r"\b(?:api[_ -]?key|access[_ -]?token|password|secret)\s*[:=]",
+    _secret_material_patterns: ClassVar[tuple[Pattern[str], ...]] = tuple(
+        re.compile(pattern, re.IGNORECASE)
+        for pattern in (
+            r"-----begin\s+(?:rsa\s+)?private\s+key-----",
+            r"\b(?:sk-[a-z0-9]{10,}|ghp_[a-z0-9]{20,}|github_pat_[a-z0-9_]+|AKIA[0-9A-Z]{16}|xox[baprs]-[a-z0-9-]+)\b",
+            r"\beyJ[a-z0-9_-]+\.eyJ[a-z0-9_-]+\.[a-z0-9_-]+\b",
+            r"\b(?:bearer|basic)\s+[a-z0-9+/=_-]{12,}",
+            r"\b(?:api[_ -]?key|access[_ -]?token|password|secret)\s*[:=]",
+        )
     )
     # A keyword in prose is useful telemetry, but is not evidence that a secret
     # was accessed.  These words deliberately produce only a low-risk finding;
@@ -158,35 +165,45 @@ class ThreatDetector:
         r"\b(?:api\s*key|access\s*token|auth\s*token|password|passwd|credential(?:s)?|private\s*key|secret|token)\b",
         re.IGNORECASE,
     )
-    _exfil_patterns = (
-        r"\b(?:send|upload|post|put|exfiltrat\w*|forward|share)\b.{0,120}\b(?:secret|token|key|credential|password|dotenv|env)\b",
-        r"\b(?:webhook|https?://|curl|wget|http_request)\b.{0,120}\b(?:secret|token|key|credential|password|dotenv|env)\b",
+    _exfil_patterns: ClassVar[tuple[Pattern[str], ...]] = tuple(
+        re.compile(pattern, re.IGNORECASE)
+        for pattern in (
+            r"\b(?:send|upload|post|put|exfiltrat\w*|forward|share)\b.{0,120}\b(?:secret|token|key|credential|password|dotenv|env)\b",
+            r"\b(?:webhook|https?://|curl|wget|http_request)\b.{0,120}\b(?:secret|token|key|credential|password|dotenv|env)\b",
+        )
     )
-    _shell_exfil_patterns = (
-        r"\b(?:cat|head|tail|grep|awk|sed|cut|env|printenv|set)\b[^\n]{0,180}(?:\.env|credentials?|private[_ -]?key|secret|token)[^\n]{0,180}\b(?:curl|wget|nc|netcat|scp|ftp)\b",
-        r"\b(?:curl|wget|nc|netcat)\b[^\n]{0,180}(?:--data|--data-raw|-d|--upload-file|--post-file)[^\n]{0,180}(?:cat|printenv|env|\.env|credentials?|secret|token)\b",
-        r"\$\([^)]*(?:cat|printenv|env)[^)]*(?:\.env|credentials?|secret|token)[^)]*\)[^\n]{0,120}\b(?:curl|wget|nc|netcat)\b",
-        r"\b(?:curl|wget)\b[^\n]*(?:-d|--data(?:-raw|-binary)?|-F|--form|-T|--upload-file|--post-file|@)[^\n]*(?:\.env|\.ssh|\.aws|credentials?|secret|token|key)",
-        r"\b(?:nc|ncat|netcat|socat)\b[^\n]*(?:\.env|credentials?|secret|token|key|cat\s+)",
-        r"\b(?:scp|rsync)\b[^\n]*(?:@|:)[^\n]*(?:\.env|credentials?|secret|token|key)",
-        r"\b(?:scp|rsync)\b[^\n]*(?:\.env|credentials?|secret|token|key)[^\n]*(?:@|:)",
-        r"(?:\.env|credentials?|secret|token|key)[^\n]*\|\s*(?:base64|xxd)\b",
-        r"/dev/tcp/",
-        r"\b(?:python|python3|powershell)(?:\s+-c)?[^\n]*(?:https?://|curl|wget|Invoke-WebRequest)",
+    _shell_exfil_patterns: ClassVar[tuple[Pattern[str], ...]] = tuple(
+        re.compile(pattern, re.IGNORECASE)
+        for pattern in (
+            r"\b(?:cat|head|tail|grep|awk|sed|cut|env|printenv|set)\b[^\n]{0,180}(?:\.env|credentials?|private[_ -]?key|secret|token)[^\n]{0,180}\b(?:curl|wget|nc|netcat|scp|ftp)\b",
+            r"\b(?:curl|wget|nc|netcat)\b[^\n]{0,180}(?:--data|--data-raw|-d|--upload-file|--post-file)[^\n]{0,180}(?:cat|printenv|env|\.env|credentials?|secret|token)\b",
+            r"\$\([^)]*(?:cat|printenv|env)[^)]*(?:\.env|credentials?|secret|token)[^)]*\)[^\n]{0,120}\b(?:curl|wget|nc|netcat)\b",
+            r"\b(?:curl|wget)\b[^\n]*(?:-d|--data(?:-raw|-binary)?|-F|--form|-T|--upload-file|--post-file|@)[^\n]*(?:\.env|\.ssh|\.aws|credentials?|secret|token|key)",
+            r"\b(?:nc|ncat|netcat|socat)\b[^\n]*(?:\.env|credentials?|secret|token|key|cat\s+)",
+            r"\b(?:scp|rsync)\b[^\n]*(?:@|:)[^\n]*(?:\.env|credentials?|secret|token|key)",
+            r"\b(?:scp|rsync)\b[^\n]*(?:\.env|credentials?|secret|token|key)[^\n]*(?:@|:)",
+            r"(?:\.env|credentials?|secret|token|key)[^\n]*\|\s*(?:base64|xxd)\b",
+            r"/dev/tcp/",
+            r"\b(?:python|python3|powershell)(?:\s+-c)?[^\n]*(?:https?://|curl|wget|Invoke-WebRequest)",
+        )
     )
-    _destructive_patterns = (
-        ("recursive_root_delete", r"\brm\s+(?:-\w*\s+)*-?r\w*(?:\s+-\w+)*\s+/(?:\s|$)"),
-        ("root_delete_with_override", r"\brm\b[^\n]*\s--no-preserve-root\s+/(?:\s|$)"),
-        ("filesystem_format", r"\b(?:mkfs(?:\.[a-z0-9]+)?|fdisk|format\s+[a-z]:)\b"),
-        ("raw_disk_overwrite", r"\bdd\b[^\n]*\bif="),
-        ("chmod_world_writable_root", r"\bchmod\s+(?:-R\s+)?777\s+/"),
-        ("fork_bomb", r":\s*\(\s*\)\s*\{[^}]*:\s*\|[^}]*&[^}]*\}\s*;\s*:"),
-        ("system_shutdown", r"\b(?:shutdown|poweroff|reboot|halt)\b"),
-        ("force_push", r"\bgit\s+push\b[^\n]*--force(?:\s|$)"),
-        ("hard_reset_main", r"\bgit\s+reset\s+--hard\b[^\n]*\bmain\b"),
+    _destructive_patterns: ClassVar[tuple[tuple[str, Pattern[str]], ...]] = tuple(
+        (label, re.compile(pattern, re.IGNORECASE))
+        for label, pattern in (
+            ("recursive_root_delete", r"\brm\s+(?:-\w*\s+)*-?r\w*(?:\s+-\w+)*\s+/(?:\s|$)"),
+            ("root_delete_with_override", r"\brm\b[^\n]*\s--no-preserve-root\s+/(?:\s|$)"),
+            ("filesystem_format", r"\b(?:mkfs(?:\.[a-z0-9]+)?|fdisk|format\s+[a-z]:)\b"),
+            ("raw_disk_overwrite", r"\bdd\b[^\n]*\bif="),
+            ("chmod_world_writable_root", r"\bchmod\s+(?:-R\s+)?777\s+/"),
+            ("fork_bomb", r":\s*\(\s*\)\s*\{[^}]*:\s*\|[^}]*&[^}]*\}\s*;\s*:"),
+            ("system_shutdown", r"\b(?:shutdown|poweroff|reboot|halt)\b"),
+            ("force_push", r"\bgit\s+push\b[^\n]*--force(?:\s|$)"),
+            ("hard_reset_main", r"\bgit\s+reset\s+--hard\b[^\n]*\bmain\b"),
+        )
     )
 
     def inspect(self, action: AgentAction) -> list[ThreatFinding]:
+        """Inspect all action fields and return deduplicated threat findings."""
         fields = list(_iter_values({"target": action.target, "content": action.content or "", "payload": action.payload, "metadata": action.metadata}, "action"))
         raw_text = "\n".join(value for _, value in fields)
         detection_text = normalize_detection_text(raw_text)
@@ -197,26 +214,11 @@ class ThreatDetector:
         findings: list[ThreatFinding] = []
 
         for label, pattern in self._injection_patterns:
-            match = re.search(pattern, raw_text, re.IGNORECASE) or re.search(pattern, combined, re.IGNORECASE)
+            match = pattern.search(raw_text) or pattern.search(combined)
             if match:
                 findings.append(self._finding(ThreatCategory.PROMPT_INJECTION, label, match.group(0), 75))
 
-        secret_path_labels = [
-            label for label, pattern in self._secret_path_patterns if re.search(pattern, raw_text, re.IGNORECASE) or re.search(pattern, decoded_source_text, re.IGNORECASE)
-        ]
-        keyword_labels = [
-            f"sensitive_field:{path}"
-            for path, _ in fields
-            if path != "action.target" and self._secret_field_pattern.search(normalize_detection_text(path))
-        ]
-        secret_path_labels = list(dict.fromkeys(secret_path_labels))
-        keyword_labels = list(dict.fromkeys(keyword_labels))
-        if any(
-            re.search(pattern, source, re.IGNORECASE)
-            for pattern in self._secret_material_patterns
-            for source in (raw_text, decoded_source_text, combined)
-        ):
-            keyword_labels.append("secret_material")
+        secret_path_labels, keyword_labels = self._secret_labels(fields, raw_text, decoded_source_text, combined)
 
         shell_sources = (raw_text, decoded_source_text, detection_text)
         shell_exfil_match = next(
@@ -224,11 +226,11 @@ class ThreatDetector:
                 match
                 for source in shell_sources
                 for pattern in self._shell_exfil_patterns
-                if (match := re.search(pattern, source, re.IGNORECASE))
+                if (match := pattern.search(source))
             ),
             None,
         )
-        exfil_match = next((re.search(pattern, combined) for pattern in self._exfil_patterns), None)
+        exfil_match = next((pattern.search(combined) for pattern in self._exfil_patterns), None)
         if shell_exfil_match:
             exfil_match = exfil_match or shell_exfil_match
             findings.append(self._finding(ThreatCategory.SECRET_EXFILTRATION, "shell_secret_exfiltration", shell_exfil_match.group(0), 98))
@@ -238,11 +240,7 @@ class ThreatDetector:
         if keyword_labels:
             findings.append(self._finding(ThreatCategory.SECRET_EXFILTRATION, "sensitive_keyword_mention", ", ".join(keyword_labels), 30))
             findings.append(self._finding(ThreatCategory.SECRET_EXFILTRATION, "sensitive_data_access", ", ".join(keyword_labels), 30))
-        mention_sources = [value for path, value in fields if path != "action.target"]
-        if any(self._sensitive_mention_pattern.search(normalize_detection_text(value)) for value in mention_sources):
-            findings.append(self._finding(ThreatCategory.SECRET_EXFILTRATION, "sensitive_keyword_mention", "sensitive keyword in user content or target", 30))
-        if self._sensitive_mention_pattern.search(normalize_detection_text(action.target)):
-            findings.append(self._finding(ThreatCategory.SECRET_EXFILTRATION, "sensitive_keyword_mention", "sensitive keyword in user content or target", 30))
+        findings.extend(self._mentions(fields, action.target))
         findings = self._deduplicate_findings(findings)
         network_action = action.action_type in {"http_request", "github_action"}
         keyword_mention_present = any(finding.label == "sensitive_keyword_mention" for finding in findings)
@@ -253,10 +251,37 @@ class ThreatDetector:
                 findings.append(self._finding(ThreatCategory.SECRET_EXFILTRATION, "secret_to_network", evidence, 95))
 
         for label, pattern in self._destructive_patterns:
-            match = re.search(pattern, raw_text, re.IGNORECASE)
+            match = pattern.search(raw_text)
             if match:
                 findings.append(self._finding(ThreatCategory.DESTRUCTIVE_COMMAND, label, match.group(0), 85))
         return findings
+
+    def _secret_labels(
+        self, fields: list[tuple[str, str]], raw_text: str, decoded_source_text: str, combined: str,
+    ) -> tuple[list[str], list[str]]:
+        secret_path_labels = [
+            label for label, pattern in self._secret_path_patterns if pattern.search(raw_text) or pattern.search(decoded_source_text)
+        ]
+        keyword_labels = [
+            f"sensitive_field:{path}"
+            for path, _ in fields
+            if path != "action.target" and self._secret_field_pattern.search(normalize_detection_text(path))
+        ]
+        secret_path_labels = list(dict.fromkeys(secret_path_labels))
+        keyword_labels = list(dict.fromkeys(keyword_labels))
+        if any(
+            pattern.search(source)
+            for pattern in self._secret_material_patterns
+            for source in (raw_text, decoded_source_text, combined)
+        ):
+            keyword_labels.append("secret_material")
+        return secret_path_labels, keyword_labels
+
+    def _mentions(self, fields: list[tuple[str, str]], target: str) -> list[ThreatFinding]:
+        mentions = [value for path, value in fields if path != "action.target"]
+        if any(self._sensitive_mention_pattern.search(normalize_detection_text(value)) for value in mentions) or self._sensitive_mention_pattern.search(normalize_detection_text(target)):
+            return [self._finding(ThreatCategory.SECRET_EXFILTRATION, "sensitive_keyword_mention", "sensitive keyword in user content or target", 30)]
+        return []
 
     @staticmethod
     def _deduplicate_findings(findings: list[ThreatFinding]) -> list[ThreatFinding]:

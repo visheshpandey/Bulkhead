@@ -28,9 +28,11 @@ class BulkheadMCPServer:
     """Handle the small JSON-RPC subset needed by coding-agent clients."""
 
     def __init__(self, evaluate: Callable[[AgentAction], Any]) -> None:
+        """Store a policy evaluator for descriptive MCP tool requests."""
         self.evaluate = evaluate
 
     def handle(self, message: dict[str, Any]) -> dict[str, Any] | None:
+        """Handle one supported JSON-RPC request or notification."""
         method = message.get("method")
         request_id = message.get("id")
         if method == "notifications/initialized":
@@ -58,6 +60,7 @@ def serve_stdio(server: BulkheadMCPServer, messages: Iterable[str] = sys.stdin) 
 
 
 def main() -> None:
+    """Serve the local policy evaluator over standard input and output."""
     serve_stdio(BulkheadMCPServer(PolicyGateway().evaluate))
 
 

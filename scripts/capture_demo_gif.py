@@ -25,6 +25,7 @@ from app.main import app
 
 
 def main() -> None:
+    """Capture the browser demo artifact."""
     listener = socket.socket()
     listener.bind(("127.0.0.1", 0))
     port = listener.getsockname()[1]

@@ -11,6 +11,8 @@ from app.core.policy import DEFAULT_INTENT
 
 
 class EvaluateRequest(BaseModel):
+    """Accept either a complete action or legacy flat action fields."""
+
     model_config = ConfigDict(extra="forbid")
 
     action: AgentAction | None = None
@@ -27,12 +29,14 @@ class EvaluateRequest(BaseModel):
     @model_validator(mode="before")
     @classmethod
     def default_null_intent(cls, value: Any) -> Any:
+        """Treat explicit null intent as the default read-only boundary."""
         if isinstance(value, dict) and value.get("intent", ...) is None:
             return {**value, "intent": DEFAULT_INTENT.model_copy(deep=True)}
         return value
 
     @model_validator(mode="after")
     def build_action(self) -> EvaluateRequest:
+        """Construct a validated action from legacy flat fields when needed."""
         if self.action is None:
             selected_type = self.action_type or self.type
             if selected_type is None:
@@ -49,16 +53,22 @@ class EvaluateRequest(BaseModel):
 
 
 class DemoResponse(BaseModel):
+    """Result of the ordered three-step demo replay."""
+
     status: str
     steps: list[DecisionResult]
     state: dict[str, Any]
 
 
 class RulePatch(BaseModel):
+    """Partial update for a learned immunity rule."""
+
     enabled: bool | None = None
 
 
 class ExportResponse(BaseModel):
+    """JSON audit collections available for export."""
+
     events: list[dict[str, Any]] = Field(default_factory=list)
     incidents: list[dict[str, Any]] = Field(default_factory=list)
     immunity_rules: list[dict[str, Any]] = Field(default_factory=list)
@@ -66,12 +76,16 @@ class ExportResponse(BaseModel):
 
 
 class LabRunRequest(BaseModel):
+    """Submitted webpage text for the deterministic public lab."""
+
     model_config = ConfigDict(extra="forbid")
 
     page: str = Field(min_length=1, max_length=20_000)
 
 
 class LabReportRequest(BaseModel):
+    """Optional visitor feedback about a potential lab bypass."""
+
     model_config = ConfigDict(extra="forbid")
 
     page: str = Field(min_length=1, max_length=20_000)

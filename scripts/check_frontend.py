@@ -14,6 +14,7 @@ import time
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
+AXE_SOURCE = ROOT / "node_modules" / "axe-core" / "axe.min.js"
 sys.path.insert(0, str(ROOT))
 os.environ["BULKHEAD_DB_PATH"] = ":memory:"
 os.environ.pop("BULKHEAD_API_KEY", None)
@@ -26,6 +27,7 @@ from app.main import app
 
 
 def check_layout(page) -> None:
+    """Assert the dashboard fits its viewport."""
     dimensions = page.evaluate("""() => ({
         viewport: innerWidth, document: document.documentElement.scrollWidth,
         fields: [...document.querySelectorAll('.app-page:not([hidden]) .field')]
@@ -38,6 +40,7 @@ def check_layout(page) -> None:
 
 
 def check_plain_visual_contract(page) -> None:
+    """Assert the dashboard contains visible styled content."""
     effects = page.evaluate("""() => {
       const visible = [...document.querySelectorAll('*')].filter((el) => {
         const style = getComputedStyle(el);
@@ -61,6 +64,7 @@ def check_plain_visual_contract(page) -> None:
 
 
 def check_arena_subtitle(page) -> None:
+    """Assert the arena subtitle remains visible."""
     subtitle = page.evaluate("""() => {
       const element = document.querySelector('#page-arena .arena-subtitle');
       const style = getComputedStyle(element);
@@ -70,10 +74,36 @@ def check_arena_subtitle(page) -> None:
     assert subtitle["fontSize"] == "13px", subtitle
 
 
+def check_axe(page) -> None:
+    """Fail when axe-core reports a serious or critical page violation."""
+    results = page.evaluate("""async () => {
+      const result = await window.axe.run(document, {
+        resultTypes: ['violations'],
+        runOnly: { type: 'tag', values: ['wcag2a', 'wcag2aa'] }
+      });
+        return result.violations
+        .filter((violation) => ['serious', 'critical'].includes(violation.impact))
+        .map((violation) => ({
+          id: violation.id,
+          impact: violation.impact,
+          nodes: violation.nodes.map((node) => ({ target: node.target, html: node.html, summary: node.failureSummary }))
+        }));
+    }""")
+    if results:
+        print("Axe diagnostics:", page.evaluate("""() => ({
+          theme: document.documentElement.dataset.theme,
+          replay: (() => { const style = getComputedStyle(document.querySelector('#arena-replay')); return {background: style.backgroundColor, color: style.color, opacity: style.opacity, disabled: document.querySelector('#arena-replay').disabled}; })(),
+          step: (() => { const style = getComputedStyle(document.querySelector('#arena-step')); return {background: style.backgroundColor, color: style.color, opacity: style.opacity, disabled: document.querySelector('#arena-step').disabled}; })()
+        })"""))
+    assert results == [], results
+
+
 def exercise(page, output: Path, arena_statuses: list[int], *, public: bool = False) -> None:
-    expect(page.locator("#connection-label")).to_have_text("Connected")
+    """Exercise the primary dashboard flows and save a screenshot."""
+    expect(page.locator("#connection-label")).to_have_text("Connected", timeout=15000)
     assert page.locator("html").get_attribute("data-theme") == "light"
     page.locator("#arena-speed").select_option("2")
+    check_axe(page)
     for _ in range(3):
         before = len(arena_statuses)
         page.locator("#arena-watch").click()
@@ -101,6 +131,7 @@ def exercise(page, output: Path, arena_statuses: list[int], *, public: bool = Fa
             page.evaluate("name => { location.hash = '#' + name; }", name)
             expect(page.locator(f"#page-{name}")).to_be_visible()
             check_layout(page)
+            check_axe(page)
             if name == "arena":
                 check_arena_subtitle(page)
             page.screenshot(path=str(output / f"{name}-{width}.png"), full_page=True)
@@ -110,9 +141,17 @@ def exercise(page, output: Path, arena_statuses: list[int], *, public: bool = Fa
             expect(page.locator(".menu-label")).to_be_visible()
         page.evaluate("location.hash = '#arena'")
         expect(page.locator("#page-arena")).to_be_visible()
+        check_axe(page)
         page.locator("#theme-toggle").click()
-        expect(page.locator("html")).to_have_attribute("data-theme", "dark")
+        if page.locator("html").get_attribute("data-theme") != "dark":
+            print("Theme diagnostics:", page.locator("#theme-toggle").evaluate("""(button) => ({
+              disabled: button.disabled,
+              text: button.textContent,
+              listeners: typeof getEventListeners !== 'undefined' ? getEventListeners(button) : null
+            })"""))
+            raise AssertionError("theme toggle did not activate dark mode")
         check_layout(page)
+        check_axe(page)
         page.screenshot(path=str(output / f"arena-dark-{width}.png"), full_page=True)
         page.locator("#theme-toggle").click()
 
@@ -145,6 +184,7 @@ def exercise(page, output: Path, arena_statuses: list[int], *, public: bool = Fa
 
 
 def main() -> None:
+    """Run browser-based frontend contract checks."""
     output = ROOT / "artifacts" / "frontend"
     output.mkdir(parents=True, exist_ok=True)
     listener = socket.socket()
@@ -160,6 +200,8 @@ def main() -> None:
                 raise TimeoutError("Isolated gateway did not start")
             time.sleep(.05)
         with sync_playwright() as playwright:
+            if not AXE_SOURCE.exists():
+                raise FileNotFoundError("Run npm ci before the axe-core browser check")
             browser = playwright.chromium.launch(headless=True)
             context = browser.new_context(base_url=f"http://127.0.0.1:{port}",
                                           viewport={"width": 1440, "height": 1000})
@@ -169,9 +211,16 @@ def main() -> None:
             page.on("pageerror", lambda error: errors.append(str(error)))
             page.on("console", lambda message: errors.append(message.text) if message.type == "error" else None)
             page.on("response", lambda response: arena_statuses.append(response.status) if "/api/evaluate" in response.url else None)
+            page.add_init_script(path=str(AXE_SOURCE))
             page.goto("/", wait_until="domcontentloaded")
             public = os.environ.get("BULKHEAD_PUBLIC_DEMO") == "1"
-            exercise(page, output, arena_statuses, public=public)
+            try:
+                exercise(page, output, arena_statuses, public=public)
+            except Exception:
+                print("Browser diagnostics:", errors)
+                print("Connection label:", page.locator("#connection-label").text_content())
+                print("Module scripts:", page.evaluate("""() => [...document.scripts].map((script) => ({src: script.src, type: script.type}))"""))
+                raise
             health = page.request.get("/healthz")
             assert health.status == 200 and health.json() == {"status": "ok", "service": "bulkhead"}
             if public:

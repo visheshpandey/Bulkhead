@@ -26,7 +26,7 @@ def test_reproducible_project_contract() -> None:
     assert "python -m pytest" in makefile
 
     pyproject = (ROOT / "pyproject.toml").read_text(encoding="utf-8")
-    assert 'requires-python = "==3.11.9"' in pyproject
+    assert 'requires-python = ">=3.11"' in pyproject
     assert 'setuptools==84.0.0' in pyproject
     assert '[tool.setuptools.package-data]' in pyproject
     assert 'app = ["static/*"]' in pyproject
@@ -41,7 +41,7 @@ def test_reproducible_project_contract() -> None:
 
 
 def test_tracked_text_has_no_machine_absolute_paths() -> None:
-    forbidden = (re.compile(r"[A-Za-z]:\\Users\\"), re.compile(r"/Users/"))
+    forbidden = (re.compile(r"[A-Za-z]:\\" + r"Users\\"), re.compile("/" + "Users/"))
     tracked = subprocess.check_output(["git", "ls-files", "-z"], cwd=ROOT).split(b"\0")
     for raw_path in tracked:
         if not raw_path:

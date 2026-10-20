@@ -6,12 +6,12 @@
   --line: #e4e6f0;
   --text: #141628;
   --text-2: #565b75;
-  --text-3: #7b819a;
+  --text-3: #5f667e;
   --accent: #5b4cf5;
   --accent-tint: #efedff;
-  --allow: #059669;
+  --allow: #047857;
   --block: #e11d48;
-  --quarantine: #d97706;
+  --quarantine: #a16207;
   --allow-tint: #e8f8f1;
   --block-tint: #fff0f3;
   --quarantine-tint: #fff6e8;
@@ -135,7 +135,7 @@ body:has(#page-arena.active) #run-demo-button { display: none; }
   background: rgb(255 255 255 / 19%);
   filter: none;
 }
-.app-page:not(#page-arena) .page-heading h1 { margin: 0 0 7px; color: #fff; font-size: clamp(28px, 4vw, 46px); font-weight: 850; letter-spacing: -.055em; line-height: 1; }
+.app-page:not(#page-arena) .page-heading h1, .app-page:not(#page-arena) .page-heading h2 { margin: 0 0 7px; color: #fff; font-size: clamp(28px, 4vw, 46px); font-weight: 850; letter-spacing: -.055em; line-height: 1; }
 .app-page:not(#page-arena) .page-heading p { max-width: 720px; color: rgb(255 255 255 / 82%); }
 .app-page:not(#page-arena) .page-heading .summary-detail { color: rgb(255 255 255 / 70%); }
 .app-page:not(#page-arena) .event-count { padding: 8px 12px; border: 1px solid rgb(255 255 255 / 25%); border-radius: 999px; background: rgb(255 255 255 / 15%); color: #fff; font-weight: 750; }
@@ -387,6 +387,34 @@ html[data-theme="dark"] #page-integrate .code-head h2::before { box-shadow: none
   #page-arena .arena-step small { display: none; }
 }
 
+html[data-theme="dark"] #page-arena .arena-controls #arena-replay,
+html[data-theme="dark"] #page-arena .arena-controls #arena-step {
+  background: #ffffff !important;
+  color: #141628 !important;
+}
+
+#page-exports #export-audit,
+#page-exports #export-csv,
+#page-exports #export-rules {
+  color: #ffffff !important;
+}
+#page-exports #export-audit { background: #075985 !important; }
+#page-exports #export-csv { background: #047857 !important; }
+#page-exports #export-rules { background: #a16207 !important; }
+
+/* Named evaluation widths keep the responsive contract explicit without
+   changing the established layout rules above. */
+@media (max-width: 1280px) { :root { --bulkhead-breakpoint-wide: 1280px; } }
+@media (max-width: 1024px) { :root { --bulkhead-breakpoint-desktop: 1024px; } }
+@media (max-width: 768px) { :root { --bulkhead-breakpoint-tablet: 768px; } }
+@media (max-width: 375px) { :root { --bulkhead-breakpoint-mobile: 375px; } }
+
+html[data-theme="dark"] #page-arena .arena-controls #arena-replay,
+html[data-theme="dark"] #page-arena .arena-controls #arena-step {
+  background: #ffffff !important;
+  color: #141628 !important;
+}
+
 @media (max-width: 959px) {
   main { padding-top: 22px; }
   .app-page:not(#page-arena) .page-heading { min-height: 110px; padding: 22px; }
@@ -402,7 +430,7 @@ html[data-theme="dark"] #page-integrate .code-head h2::before { box-shadow: none
 @media (max-width: 680px) {
   .app-shell { padding-inline: 16px; }
   .app-page:not(#page-arena) .page-heading { align-items: flex-start; flex-direction: column; min-height: 0; padding: 22px 20px; }
-  .app-page:not(#page-arena) .page-heading h1 { font-size: 34px; }
+  .app-page:not(#page-arena) .page-heading h1, .app-page:not(#page-arena) .page-heading h2 { font-size: 34px; }
   .arena-intro { flex-direction: column; padding: 24px 20px; }
   .arena-intro h1 { font-size: clamp(31px, 10vw, 44px); }
   .arena-play { width: 100%; }
@@ -431,6 +459,12 @@ html[data-theme="dark"] #page-integrate .code-head h2::before { box-shadow: none
   .data-table { min-width: max-content; }
   .table-scroll { max-width: 100%; overflow-x: auto; }
   .button { min-height: 40px; }
+}
+
+/* Keep the compact visual language while making touch interaction forgiving. */
+@media (pointer: coarse) {
+  .text-button, .more-menu summary, .main-nav a, .scenario-list button { min-height: 40px; }
+  .text-button { padding-inline: 8px; }
 }
 
 @media (min-width: 681px) and (max-width: 899px) {
@@ -473,6 +507,12 @@ html[data-theme="dark"] {
 .brand::before { background: var(--accent); }
 .button-primary, .button-primary:hover { background: var(--accent); border-color: var(--accent); color: #fff; }
 .empty-state .button { background: var(--accent); border-color: var(--accent); color: #fff; }
+html[data-theme="dark"] .button-primary, html[data-theme="dark"] .button-primary:hover { background: #2f5d8a; border-color: #2f5d8a; color: #fff; }
+html[data-theme="dark"] .button-secondary { background: #171926; color: #ecedf6; }
+html[data-theme="dark"] .arena-finish { background: #047857; border-color: #047857; color: #fff; }
+html[data-theme="dark"] .arena-finish .button-secondary { background: transparent; border-color: #fff; color: #fff; }
+html[data-theme="dark"] #page-arena .arena-controls #arena-replay,
+html[data-theme="dark"] #page-arena .arena-controls #arena-step { background: #ffffff; color: #141628; }
 
 .app-page:not(#page-arena) .page-heading { box-shadow: none; }
 #page-lab .page-heading { background-color: #c2410c; }
@@ -596,4 +636,10 @@ html[data-theme="dark"] {
   #page-arena .arena-flows { min-height: 0; }
   #page-arena .arena-flow-with { padding-bottom: 8px; }
   #page-arena #arena-replay-result:not([hidden]) { margin-bottom: 0; }
+}
+
+html[data-theme="dark"] #page-arena .arena-controls #arena-replay,
+html[data-theme="dark"] #page-arena .arena-controls #arena-step {
+  background: #ffffff !important;
+  color: #141628 !important;
 }

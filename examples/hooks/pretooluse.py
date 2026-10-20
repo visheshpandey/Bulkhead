@@ -9,6 +9,7 @@ from urllib.request import Request, urlopen
 
 
 def main() -> int:
+    """Evaluate a hook payload and print the gateway response."""
     payload = json.load(sys.stdin) if not sys.stdin.isatty() else json.loads(sys.argv[1])
     endpoint = os.environ.get("BULKHEAD_URL", "http://127.0.0.1:8000/api/evaluate")
     request = Request(endpoint, data=json.dumps(payload).encode(), headers={"Content-Type": "application/json"}, method="POST")

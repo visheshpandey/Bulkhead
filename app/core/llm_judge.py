@@ -29,6 +29,7 @@ class LLMJudge:
     """Validate an optional callable model without making external calls."""
 
     def __init__(self, model: Callable[[dict[str, Any]], Any] | None = None) -> None:
+        """Store the optional local model callable."""
         self.model = model
 
     def judge(
@@ -38,12 +39,13 @@ class LLMJudge:
         *,
         deterministic_risk: int | None = None,
     ) -> JudgeResult:
+        """Request a validated second opinion for borderline risk scores."""
         # PolicyGateway always supplies a deterministic score.  A direct caller
         # may omit it to use this class as a standalone contract adapter; that
         # does not weaken the gateway's borderline-only integration.
         if deterministic_risk is not None and not 30 <= deterministic_risk <= 69:
             return JudgeResult(
-                risk=deterministic_risk,
+                risk=deterministic_risk if deterministic_risk is not None else 0,
                 rationale="Deterministic policy did not require a borderline judge.",
             )
         if self.model is None:
@@ -59,7 +61,7 @@ class LLMJudge:
             return result if isinstance(result, JudgeResult) else JudgeResult.model_validate(result)
         except Exception as exc:  # noqa: BLE001 - a model failure must not affect policy
             return JudgeResult(
-                risk=deterministic_risk,
+                risk=deterministic_risk if deterministic_risk is not None else 0,
                 rationale=f"Judge unavailable ({type(exc).__name__}); deterministic policy remains authoritative.",
             )
 
@@ -73,4 +75,5 @@ def judge_action(
     *,
     deterministic_risk: int | None = None,
 ) -> JudgeResult:
+    """Adapt a model callable to the local judge contract."""
     return LLMJudge(model).judge(action, intent, deterministic_risk=deterministic_risk)

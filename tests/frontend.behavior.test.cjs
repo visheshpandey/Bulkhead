@@ -4,7 +4,9 @@ const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 
-const script = fs.readFileSync(path.join(__dirname, '../app/static/app.js'), 'utf8');
+const moduleFiles = ['core.js', 'activity.js', 'rules.js', 'drawer.js', 'exports.js', 'arena.js', 'lab.js', 'integrate.js', 'guide.js', 'evaluate.js', 'app.js'];
+const moduleSources = Object.fromEntries(moduleFiles.map((file) => [file, fs.readFileSync(path.join(__dirname, '../app/static', file), 'utf8')]));
+const script = moduleFiles.map((file) => moduleSources[file]).join('\n');
 const scenarios = JSON.parse(fs.readFileSync(path.join(__dirname, '../app/static/scenarios.json'), 'utf8'));
 const names = 'run-demo-button reset-button theme-toggle connection-label request-rate refresh-button demo-bar demo-step demo-next demo-exit summary-line summary-detail event-count decision-filter action-filter search-filter log-body activity-empty empty-demo-button latest-decision latest-risk latest-reason latest-target latest-action finding-list flow-diagram honey-summary capture-list containment-comparison without-action with-action scenario-list run-all-scenarios batch-summary scenario-results scenario-results-body action-form intent-goal allowed-paths denied-paths allow-network default-intent intent-status intent-goal-error action-type action-target action-target-error action-content action-payload action-payload-error evaluate-button action-status safe-fixture malicious-fixture test-result-summary test-result-reason test-result-findings test-result-output rule-count rules-list rules-empty export-audit export-csv export-rules export-incidents export-status report-select incident-preview download-report event-drawer drawer-title drawer-body drawer-close copy-event-json drawer-close-secondary drawer-backdrop toast page-activity page-test page-rules page-exports arena-watch arena-without-steps arena-with-steps arena-finish arena-error arena-replay-result with-result without-result arena-replay arena-step arena-speed arena-try arena-integrate technical-toggle'.split(' ');
 const baseIntent = { goal: 'Read files', allowed_actions: ['read_file'], allowed_targets: ['/workspace/'], denied_targets: [], allow_network: false };
@@ -16,7 +18,7 @@ const deferred = () => { let resolve; const promise = new Promise((done) => { re
 const flush = async () => { for (let i = 0; i < 250; i++) await Promise.resolve(); };
 
 function boot({ initial = snapshot(), intent = baseIntent, intentPending = null, confirm = true, storageError = false } = {}) {
-  const calls = [], queues = new Map(), intervals = [], downloads = [];
+  const calls = [], queues = new Map(), intervals = [], timeouts = [], downloads = [];
   let document;
   class Element {
     constructor(tag = 'div') { this.tagName = tag; this.children = []; this.listeners = {}; this.dataset = {}; this.attributes = {}; this.style = {}; this.className = ''; this.value = ''; this.hidden = false; this.disabled = false; this.checked = false; this._text = ''; this.parentNode = null; this.isConnected = true; this.classList = { add: (name) => { this.className = [...new Set([...this.className.split(/\s+/), name])].join(' ').trim(); }, remove: (name) => { this.className = this.className.split(/\s+/).filter((part) => part !== name).join(' '); }, contains: (name) => this.className.split(/\s+/).includes(name), toggle: (name, value) => value ? this.classList.add(name) : this.classList.remove(name) }; }
@@ -27,7 +29,7 @@ function boot({ initial = snapshot(), intent = baseIntent, intentPending = null,
     prepend(child) { child.parentNode = this; this.children.unshift(child); }
     replaceChildren(...children) { this.children.forEach((child) => { child.parentNode = null; }); this.children = []; this._text = ''; this.append(...children); }
     addEventListener(type, listener) { (this.listeners[type] ||= []).push(listener); }
-    fire(type, extra = {}) { const e = { type, target: this, currentTarget: this, preventDefault() {}, stopPropagation() {}, ...extra }; for (const listener of this.listeners[type] || []) listener(e); }
+    fire(type, extra = {}) { const e = { type, target: this, currentTarget: this, preventDefault() {}, stopPropagation() {}, ...extra }; for (const listener of this.listeners[type] || []) listener(e); if (type === 'click' && this.onclick) this.onclick(e); }
     setAttribute(name, value) { this.attributes[name] = value; }
     removeAttribute(name) { delete this.attributes[name]; }
     focus() { document.activeElement = this; }
@@ -46,11 +48,14 @@ function boot({ initial = snapshot(), intent = baseIntent, intentPending = null,
   let count = 0;
   const fetch = (url, options = {}) => { calls.push({ url, options }); const queue = queues.get(url); if (queue?.length) { const value = queue.shift(); return value?.promise || Promise.resolve(value?.ok === false ? value : ok(value)); } if (url === '/api/state') return Promise.resolve(ok(initial)); if (url === '/api/default-intent') return intentPending?.promise || Promise.resolve(ok(intent)); if (url === '/static/scenarios.json') return Promise.resolve(ok(scenarios)); if (url === '/api/evaluate') { const action = JSON.parse(options.body).action; const decision = action.target.includes('README') ? 'allow' : action.content?.includes('1gn0re') ? 'block' : action.target.includes('.env') ? 'quarantine' : 'block'; return Promise.resolve(ok({ decision, risk_score: 80, reason: 'Gateway decision', event: { ...event(`e${++count}`, decision), action } })); } return Promise.resolve(ok({})); };
   class EventSource { constructor() { this.listeners = {}; EventSource.instance = this; } addEventListener(name, listener) { this.listeners[name] = listener; } emit(name, value) { this.listeners[name]({ data: JSON.stringify(value) }); } close() {} }
-  const window = { setInterval: (fn, ms) => { intervals.push({ fn, ms }); return intervals.length; }, setTimeout: () => 1, clearTimeout() {}, addEventListener() {}, matchMedia: () => ({ matches: true }), innerHeight: 800, innerWidth: 1280, confirm: () => confirm };
+  const window = { setInterval: (fn, ms) => { intervals.push({ fn, ms }); return intervals.length; }, setTimeout: (fn, ms) => { timeouts.push({ fn, ms }); return timeouts.length; }, clearTimeout() {}, addEventListener() {}, matchMedia: () => ({ matches: true }), innerHeight: 800, innerWidth: 1280, confirm: () => confirm };
   const location = { hash: '' };
   const localStorage = { getItem: () => { if (storageError) throw Error('denied'); return null; }, setItem: () => { if (storageError) throw Error('denied'); } };
-  vm.runInNewContext(script, { document, window, location, localStorage, navigator: { clipboard: { writeText: async () => {} } }, URL: { createObjectURL: () => 'blob:test', revokeObjectURL() {} }, Blob, fetch, EventSource, console });
-  return { elements, links, document, calls, intervals, downloads, source: EventSource.instance, queue(url, value) { (queues.get(url) || queues.set(url, []).get(url)).push(value); }, tick: async () => { intervals[0].fn(); await flush(); }, fireKey: (extra) => { for (const listener of document.listeners.keydown || []) listener({ preventDefault() {}, ...extra }); } };
+  const bundled = moduleFiles.map((file) => moduleSources[file]
+    .replace(/^import .*?;\s*$/gm, '')
+    .replace(/\bexport\s+(?=(?:const|let|var|function|async function|class)\b)/g, '')).join('\n');
+  vm.runInNewContext(bundled, { document, window, location: { ...location, search: '' }, localStorage, navigator: { clipboard: { writeText: async () => {} } }, URL: { createObjectURL: () => 'blob:test', revokeObjectURL() {} }, Blob, fetch, EventSource, console });
+  return { elements, links, document, calls, intervals, timeouts, downloads, source: EventSource.instance, queue(url, value) { (queues.get(url) || queues.set(url, []).get(url)).push(value); }, tick: async () => { intervals[0].fn(); await flush(); }, fireKey: (extra) => { for (const listener of document.listeners.keydown || []) listener({ preventDefault() {}, ...extra }); } };
 }
 
 test('navigation, filtering, keyboard rows and safe event details', async () => {
@@ -141,6 +146,20 @@ test('SSE reset clears immediately and ignores stale responses; healthy stream s
   a.source.emit('audit_event', event('fresh')); assert.equal(a.elements['event-count'].textContent, '1 event');
   a.queue('/api/state', snapshot()); a.queue('/api/state', snapshot([event('canonical')])); await a.tick();
   assert.equal(a.elements['event-count'].textContent, '1 event');
+});
+
+test('event timeline is capped without changing newest-event ordering', async () => {
+  const events = Array.from({ length: 501 }, (_, index) => event(`timeline-${index}`));
+  const a = boot({ initial: snapshot(events) }); await flush();
+  assert.equal(a.elements['event-count'].textContent, '200 events');
+  assert.equal(a.elements['log-body'].children[0].dataset.eventId, 'timeline-500');
+});
+
+test('search filtering uses the requested 200ms debounce', async () => {
+  const a = boot(); await flush();
+  a.elements['search-filter'].value = 'README';
+  a.elements['search-filter'].fire('input');
+  assert.equal(a.timeouts.at(-1).ms, 200);
 });
 
 test('canonical default, editable nested intent, keyboard evaluation and theme storage denial', async () => {

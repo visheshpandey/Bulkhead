@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+from dataclasses import dataclass
 from pathlib import PurePosixPath
 from typing import Any
 
@@ -19,6 +20,8 @@ from .models import (
     AgentAction,
     Decision,
     DecisionResult,
+    ImmunityRule,
+    PolicyStage,
     ThreatCategory,
     ThreatFinding,
     UserIntent,
@@ -31,29 +34,64 @@ DEFAULT_INTENT = UserIntent(
     denied_targets=[],
     allow_network=False,
 )
+HIGH_RISK_SEVERITY = 70
+JUDGE_MIN_RISK = 30
+JUDGE_MAX_RISK = 69
+BLOCKED_BY_IMMUNITY_REASON = "Blocked by a Rule generated from a prior attack."
+DESTRUCTIVE_COMMAND_REASON = "Blocked because the command matches a destructive-operation policy."
+QUARANTINE_REASON = "Decoyed for safe observation with fake data."
+INTENT_VIOLATION_REASON = "Action is outside the supplied user intent."
+ALLOW_REASON = "Action matches the current user intent; low-severity keyword signals were recorded without blocking."
+POLICY_STAGE_ORDER: tuple[PolicyStage, ...] = (
+    PolicyStage.DETECTION,
+    PolicyStage.INTENT,
+    PolicyStage.IMMUNITY,
+    PolicyStage.DECISION,
+    PolicyStage.EXPLAINABILITY,
+    PolicyStage.AUDIT,
+    PolicyStage.HONEYWORLD,
+)
+
+
+@dataclass(frozen=True)
+class _PolicyDecision:
+    """Internal decision values shared by the policy stages."""
+
+    decision: Decision
+    reason: str
+    risk_score: int
 
 
 class PolicyGateway:
+    """Evaluate agent actions through deterministic, ordered policy stages."""
+
     def __init__(
         self,
         ledger: EventLedger | None = None,
         honeyworld: HoneyWorld | None = None,
         llm_judge: LLMJudge | None = None,
     ) -> None:
+        """Create a gateway with optional persistence, decoy, and judge adapters.
+
+        Args:
+            ledger: Audit storage. A new ledger is created when omitted.
+            honeyworld: Quarantine runtime. A new runtime is created when omitted.
+            llm_judge: Optional local explainability adapter.
+        """
         self.ledger = ledger or EventLedger()
         self.honeyworld = honeyworld or HoneyWorld()
         self.detector = ThreatDetector()
         self.llm_judge = llm_judge or LLMJudge()
 
     @staticmethod
-    def fingerprint(action: AgentAction) -> str:
+    def fingerprint(action: AgentAction, findings: list[ThreatFinding] | None = None) -> str:
         """Return a stable fingerprint tolerant of harmless formatting changes.
 
         Agent ids and metadata are deliberately excluded: they describe the caller,
         rather than the operation being protected.  Paths, object key order, URL
         casing, and whitespace are canonicalized before hashing.
         """
-        findings = ThreatDetector().inspect(action)
+        findings = findings if findings is not None else ThreatDetector().inspect(action)
         value = {
             "action_type": getattr(action.action_type, "value", action.action_type),
             "target": PolicyGateway._canonical_target(action.target),
@@ -144,6 +182,48 @@ class PolicyGateway:
             )
         return findings
 
+    def _decision_stage(
+        self,
+        findings: list[ThreatFinding],
+        existing_rule: ImmunityRule | None,
+    ) -> _PolicyDecision:
+        """Select a decision from detector, intent, and immunity findings."""
+        if existing_rule:
+            return _PolicyDecision(Decision.BLOCK, BLOCKED_BY_IMMUNITY_REASON, 100)
+
+        security_findings = [finding for finding in findings if finding.category != ThreatCategory.INTENT_VIOLATION]
+        high_security_finding = any(finding.severity >= HIGH_RISK_SEVERITY for finding in security_findings)
+        has_prompt_injection = any(finding.category == ThreatCategory.PROMPT_INJECTION for finding in security_findings)
+        has_sensitive_file = any(finding.label == "sensitive_file_access" for finding in security_findings)
+        has_keyword_network = any(finding.label == "secret_to_network" for finding in security_findings)
+        risk_score = min(100, max((finding.severity for finding in findings), default=0))
+
+        if any(finding.category == ThreatCategory.DESTRUCTIVE_COMMAND for finding in findings):
+            return _PolicyDecision(Decision.BLOCK, DESTRUCTIVE_COMMAND_REASON, risk_score)
+        if has_prompt_injection or has_sensitive_file or has_keyword_network or high_security_finding:
+            return _PolicyDecision(Decision.QUARANTINE, QUARANTINE_REASON, risk_score)
+        if any(finding.category == ThreatCategory.INTENT_VIOLATION for finding in findings):
+            return _PolicyDecision(Decision.BLOCK, INTENT_VIOLATION_REASON, risk_score)
+        return _PolicyDecision(Decision.ALLOW, ALLOW_REASON, risk_score)
+
+    def _explainability_stage(
+        self,
+        action: AgentAction,
+        intent: UserIntent,
+        policy_decision: _PolicyDecision,
+    ) -> _PolicyDecision:
+        """Append optional judge rationale without changing the policy outcome."""
+        if setting("LLM_JUDGE") != "1" or not JUDGE_MIN_RISK <= policy_decision.risk_score <= JUDGE_MAX_RISK:
+            return policy_decision
+        judge_result = self.llm_judge.judge(action, intent, deterministic_risk=policy_decision.risk_score)
+        if not judge_result.rationale or judge_result.rationale.startswith("Deterministic policy"):
+            return policy_decision
+        return _PolicyDecision(
+            policy_decision.decision,
+            f"{policy_decision.reason} Judge rationale: {judge_result.rationale}",
+            policy_decision.risk_score,
+        )
+
     @staticmethod
     def _target_is_within(target: str, allowed: str) -> bool:
         """Match a path itself or a complete folder, never a prefix lookalike."""
@@ -169,17 +249,24 @@ class PolicyGateway:
         run_honeyworld: bool = True,
         agent_id: str | None = None,
     ) -> DecisionResult:
-        intent = intent or DEFAULT_INTENT.model_copy(deep=True)
-        fingerprint = self.fingerprint(action)
-        existing_rule = self.ledger.find_immunity(fingerprint)
-        findings = self.detector.inspect(action)
-        findings.extend(self._intent_findings(action, intent))
+        """Evaluate an action through detection, intent, decision, and audit stages.
 
-        security_findings = [finding for finding in findings if finding.category != ThreatCategory.INTENT_VIOLATION]
-        high_security_finding = any(finding.severity >= 70 for finding in security_findings)
-        has_prompt_injection = any(finding.category == ThreatCategory.PROMPT_INJECTION for finding in security_findings)
-        has_sensitive_file = any(finding.label == "sensitive_file_access" for finding in security_findings)
-        has_keyword_network = any(finding.label == "secret_to_network" for finding in security_findings)
+        Args:
+            action: Validated descriptive tool-call data.
+            intent: User boundary applied to the action, or the read-only default.
+            run_honeyworld: Whether quarantined actions receive a decoy receipt.
+            agent_id: Optional caller identity stored on the audit event.
+
+        Returns:
+            The deterministic decision and any associated audit or quarantine data.
+        """
+        intent = intent or DEFAULT_INTENT.model_copy(deep=True)
+        # Keep the stage order explicit: immunity lookup precedes fresh detection,
+        # while audit persistence follows optional explainability and decoying.
+        detector_findings = self.detector.inspect(action)
+        findings = [*detector_findings, *self._intent_findings(action, intent)]
+        fingerprint = self.fingerprint(action, detector_findings)
+        existing_rule = self.ledger.find_immunity(fingerprint)
 
         if existing_rule:
             existing_rule = self.ledger.mark_rule_matched(existing_rule.id) or existing_rule
@@ -191,33 +278,11 @@ class PolicyGateway:
                     severity=100,
                 )
             ]
-            decision = Decision.BLOCK
-            reason = "Blocked by a Rule generated from a prior attack."
-            risk_score = 100
-        elif any(f.category == ThreatCategory.DESTRUCTIVE_COMMAND for f in findings):
-            decision = Decision.BLOCK
-            reason = "Blocked because the command matches a destructive-operation policy."
-            risk_score = min(100, max(f.severity for f in findings))
-        elif has_prompt_injection or has_sensitive_file or has_keyword_network or high_security_finding:
-            decision = Decision.QUARANTINE
-            reason = "Decoyed for safe observation with fake data."
-            risk_score = min(100, max(f.severity for f in findings))
-        elif any(finding.category == ThreatCategory.INTENT_VIOLATION for finding in findings):
-            decision = Decision.BLOCK
-            reason = "Action is outside the supplied user intent."
-            risk_score = min(100, max(f.severity for f in findings))
-        else:
-            decision = Decision.ALLOW
-            reason = "Action matches the current user intent; low-severity keyword signals were recorded without blocking."
-            risk_score = min(100, max((f.severity for f in findings), default=0))
-
-        # The optional judge is explainability only.  It is intentionally gated
-        # by an explicit environment flag and a deterministic borderline score;
-        # it never changes the decision or invokes a network client by itself.
-        if setting("LLM_JUDGE") == "1" and 30 <= risk_score <= 69:
-            judge_result = self.llm_judge.judge(action, intent, deterministic_risk=risk_score)
-            if judge_result.rationale and not judge_result.rationale.startswith("Deterministic policy"):
-                reason = f"{reason} Judge rationale: {judge_result.rationale}"
+        policy_decision = self._decision_stage(findings, existing_rule)
+        policy_decision = self._explainability_stage(action, intent, policy_decision)
+        decision = policy_decision.decision
+        reason = policy_decision.reason
+        risk_score = policy_decision.risk_score
 
         event = self.ledger.record_event(
             action=action,
@@ -256,11 +321,13 @@ class PolicyGateway:
         )
 
     def reset(self) -> None:
+        """Reset decoy state and the ledger for a fresh run."""
         self.honeyworld.reset()
         # Reset decoys before publishing the ledger reset to stream subscribers.
         self.ledger.reset()
 
     def state(self) -> dict[str, Any]:
+        """Summarize current audit, incident, and immunity state."""
         events = self.ledger.events()
         incidents = self.ledger.incidents()
         rules = self.ledger.immunity_rules()

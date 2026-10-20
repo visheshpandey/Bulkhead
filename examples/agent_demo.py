@@ -10,6 +10,7 @@ from app.core.policy import PolicyGateway
 
 
 def main() -> None:
+    """Run the in-process integration demonstration."""
     # The example calls the in-process policy gateway. It does not read a real
     # file, make an HTTP request, or execute the webpage's suggested command.
     gateway = PolicyGateway()

@@ -17,6 +17,7 @@ class BulkheadBlocked(RuntimeError):
     """Raised when Bulkhead refuses or quarantines a tool call."""
 
     def __init__(self, decision: dict[str, Any]) -> None:
+        """Keep the rejected decision for callers inspecting the failure."""
         self.decision = decision
         super().__init__(decision.get("reason", "Bulkhead blocked the tool call"))
 
@@ -33,6 +34,7 @@ class BulkheadClient:
         timeout: float = 10.0,
         opener: Callable[..., HTTPResponse] = urlopen,
     ) -> None:
+        """Configure the endpoint, agent identity, and HTTP transport."""
         self.base_url = base_url.rstrip("/")
         self.api_key = api_key
         self.agent_id = agent_id
@@ -52,6 +54,7 @@ class BulkheadClient:
         metadata: dict[str, Any] | None = None,
         run_honeyworld: bool = True,
     ) -> dict[str, Any]:
+        """Submit an action or individual action fields to the policy gateway."""
         body: dict[str, Any] = {"run_honeyworld": run_honeyworld}
         if action is not None:
             body["action"] = action.model_dump(mode="json") if isinstance(action, AgentAction) else action
@@ -97,7 +100,10 @@ class BulkheadClient:
         )
         try:
             with self._opener(request, timeout=self.timeout) as response:
-                return json.loads(response.read().decode("utf-8"))
+                result = json.loads(response.read().decode("utf-8"))
+                if not isinstance(result, dict):
+                    raise ValueError("Bulkhead response must be a JSON object")
+                return result
         except HTTPError as exc:
             detail = exc.read().decode("utf-8", errors="replace")
             raise RuntimeError(f"Bulkhead rejected request ({exc.code}): {detail}") from exc

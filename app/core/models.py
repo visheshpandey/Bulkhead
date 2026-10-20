@@ -12,6 +12,8 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 
 
 class ActionType(str, Enum):
+    """Tool operation categories understood by the policy gateway."""
+
     READ_FILE = "read_file"
     WRITE_FILE = "write_file"
     RUN_COMMAND = "run_command"
@@ -20,12 +22,16 @@ class ActionType(str, Enum):
 
 
 class Decision(str, Enum):
+    """Policy outcomes returned to callers."""
+
     ALLOW = "allow"
     BLOCK = "block"
     QUARANTINE = "quarantine"
 
 
 class ThreatCategory(str, Enum):
+    """High-level categories assigned to detector findings."""
+
     PROMPT_INJECTION = "prompt_injection"
     SECRET_EXFILTRATION = "secret_exfiltration"
     INTENT_VIOLATION = "intent_violation"
@@ -33,7 +39,20 @@ class ThreatCategory(str, Enum):
     IMMUNITY_RULE = "immunity_rule"
 
 
+class PolicyStage(str, Enum):
+    """Ordered stages used to evaluate and persist an agent action."""
+
+    DETECTION = "detection"
+    INTENT = "intent"
+    IMMUNITY = "immunity"
+    DECISION = "decision"
+    EXPLAINABILITY = "explainability"
+    AUDIT = "audit"
+    HONEYWORLD = "honeyworld"
+
+
 def utc_now() -> datetime:
+    """Return the current UTC timestamp for persisted models."""
     return datetime.now(UTC)
 
 
@@ -52,6 +71,7 @@ class AgentAction(BaseModel):
     @field_validator("target")
     @classmethod
     def validate_target(cls, value: str) -> str:
+        """Require a printable, nonblank action target."""
         value = value.strip()
         if not value:
             raise ValueError("target is required and must not be blank")
@@ -62,6 +82,7 @@ class AgentAction(BaseModel):
     @field_validator("content")
     @classmethod
     def validate_content(cls, value: str | None) -> str | None:
+        """Reject binary control characters in action content."""
         if value is not None and any(ord(character) < 32 and character not in "\t\n\r" for character in value):
             raise ValueError("content contains a control character")
         return value
@@ -69,6 +90,7 @@ class AgentAction(BaseModel):
     @field_validator("agent_id")
     @classmethod
     def validate_agent_id(cls, value: str) -> str:
+        """Normalize and validate the agent identifier."""
         value = value.strip()
         if not value or any(ord(character) < 32 for character in value):
             raise ValueError("agent_id must be a non-blank printable string")
@@ -77,6 +99,7 @@ class AgentAction(BaseModel):
     @field_validator("payload", "metadata")
     @classmethod
     def validate_structured_input(cls, value: dict[str, Any]) -> dict[str, Any]:
+        """Validate bounded JSON-compatible action metadata."""
         _validate_json_tree(value)
         if len(json.dumps(value, ensure_ascii=False, separators=(",", ":"))) > 200_000:
             raise ValueError("payload JSON must be at most 200 KB")
@@ -85,6 +108,7 @@ class AgentAction(BaseModel):
     @model_validator(mode="before")
     @classmethod
     def accept_action_aliases(cls, value: Any) -> Any:
+        """Accept legacy action and type keys as action_type."""
         if isinstance(value, dict):
             value = dict(value)
             if "action_type" not in value:
@@ -103,29 +127,43 @@ class AgentAction(BaseModel):
 
 def _validate_json_tree(value: Any, *, depth: int = 0) -> None:
     """Reject values that cannot be safely handled by the deterministic gateway."""
-    if depth > 12:
-        raise ValueError("payload nesting is too deep")
+    _validate_depth(depth)
     if isinstance(value, dict):
-        if len(value) > 256:
-            raise ValueError("payload has too many fields")
+        _validate_collection_size(len(value), "payload has too many fields")
         for key, child in value.items():
             if not isinstance(key, str) or len(key) > 256 or any(ord(character) < 32 for character in key):
                 raise ValueError("payload field names must be short strings")
             _validate_json_tree(child, depth=depth + 1)
     elif isinstance(value, (list, tuple)):
-        if len(value) > 256:
-            raise ValueError("payload list is too large")
+        _validate_collection_size(len(value), "payload list is too large")
         for child in value:
             _validate_json_tree(child, depth=depth + 1)
     elif isinstance(value, str):
-        if len(value) > 200_000:
-            raise ValueError("payload value is too large")
-        if any(ord(character) < 32 and character not in "\t\n\r" for character in value):
-            raise ValueError("payload contains a control character")
+        _validate_json_string(value)
     elif isinstance(value, float) and not math.isfinite(value):
         raise ValueError("payload contains a non-finite number")
     elif value is not None and not isinstance(value, (bool, int, float)):
         raise ValueError("payload contains an unsupported value")
+
+
+def _validate_json_string(value: str) -> None:
+    """Reject oversized text or control characters inside JSON values."""
+    if len(value) > 200_000:
+        raise ValueError("payload value is too large")
+    if any(ord(character) < 32 and character not in "\t\n\r" for character in value):
+        raise ValueError("payload contains a control character")
+
+
+def _validate_depth(depth: int) -> None:
+    """Reject excessively nested JSON values."""
+    if depth > 12:
+        raise ValueError("payload nesting is too deep")
+
+
+def _validate_collection_size(size: int, message: str) -> None:
+    """Reject oversized JSON objects and arrays."""
+    if size > 256:
+        raise ValueError(message)
 
 
 def _flatten_searchable(value: Any, path: str) -> list[str]:
@@ -146,7 +184,11 @@ def _flatten_searchable(value: Any, path: str) -> list[str]:
 
 
 class UserIntent(BaseModel):
-    """Optional user boundary for a group of agent actions."""
+    """Optional user boundary for a group of agent actions.
+
+    The default values intentionally describe a local, read-only workspace so
+    callers must opt in to broader capabilities.
+    """
 
     model_config = ConfigDict(use_enum_values=True, extra="forbid")
 
@@ -162,6 +204,7 @@ class UserIntent(BaseModel):
     @field_validator("goal")
     @classmethod
     def validate_goal(cls, value: str) -> str:
+        """Require a bounded, nonblank intent goal."""
         value = value.strip()
         if not value or len(value) > 20_000:
             raise ValueError("goal must be a non-empty, bounded string")
@@ -170,6 +213,7 @@ class UserIntent(BaseModel):
     @field_validator("allowed_targets", "denied_targets")
     @classmethod
     def validate_targets(cls, value: list[str] | None) -> list[str] | None:
+        """Validate optional allow and deny target lists."""
         if value is None:
             return None
         if len(value) > 128:
@@ -188,6 +232,8 @@ class UserIntent(BaseModel):
 
 
 class ThreatFinding(BaseModel):
+    """A single piece of evidence produced by a detector or policy check."""
+
     category: ThreatCategory
     label: str
     evidence: str
@@ -195,6 +241,8 @@ class ThreatFinding(BaseModel):
 
 
 class ImmunityRule(BaseModel):
+    """A durable fingerprint rule learned from a quarantined incident."""
+
     id: str
     fingerprint: str
     description: str
@@ -206,6 +254,8 @@ class ImmunityRule(BaseModel):
 
 
 class AuditEvent(BaseModel):
+    """The immutable audit record for one evaluated action."""
+
     id: str
     agent_id: str | None = None
     timestamp: datetime = Field(default_factory=utc_now)
@@ -221,6 +271,8 @@ class AuditEvent(BaseModel):
 
 
 class Incident(BaseModel):
+    """A quarantined action and the evidence used to create its rule."""
+
     id: str
     created_at: datetime = Field(default_factory=utc_now)
     status: str = "quarantined"
@@ -232,6 +284,8 @@ class Incident(BaseModel):
 
 
 class DecisionResult(BaseModel):
+    """Complete policy response, including audit, incident, and decoy data."""
+
     decision: Decision
     allowed: bool
     reason: str

@@ -26,6 +26,7 @@ class MCPProxy:
         *,
         action_type: ActionType | str = ActionType.RUN_COMMAND,
     ) -> None:
+        """Configure the gateway client and optional permitted tool callback."""
         self.client = client
         self.invoke = invoke
         self.action_type = action_type
@@ -36,6 +37,7 @@ class MCPProxy:
         arguments: dict[str, Any] | None = None,
         intent: UserIntent | dict[str, Any] | None = None,
     ) -> dict[str, Any]:
+        """Describe an MCP tool call to the policy gateway."""
         return self.client.evaluate(
             action_type=self.action_type,
             target=f"mcp://{tool_name}",
@@ -53,6 +55,7 @@ class MCPProxy:
         *,
         invoke: Callable[[str, dict[str, Any]], Any] | None = None,
     ) -> Any:
+        """Invoke the supplied callback only when the gateway allows the call."""
         arguments = arguments or {}
         decision = self.evaluate(tool_name, arguments, intent)
         if decision.get("decision") != "allow":

@@ -14,3 +14,9 @@ data/
 artifacts/
 .opencode/
 docs/screenshots/
+node_modules/
+coverage/
+.mypy_cache/
+.coverage
+playwright-report/
+test-results/

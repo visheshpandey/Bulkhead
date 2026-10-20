@@ -27,6 +27,8 @@ PUBLIC_RATE_LIMITED_PATHS = frozenset({
 
 @dataclass
 class DemoSession:
+    """Isolated gateway and lab history for one public visitor."""
+
     session_id: str
     gateway: PolicyGateway
     created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
@@ -39,12 +41,15 @@ class DemoSession:
 
 @dataclass
 class LabScore:
+    """Thread-safe aggregate of public lab attempts."""
+
     attempts: int = 0
     stopped: int = 0
     bypassed: int = 0
     _lock: RLock = field(default_factory=RLock, repr=False)
 
     def record(self, *, stopped: bool) -> None:
+        """Record one attempted injection and its outcome."""
         with self._lock:
             self.attempts += 1
             if stopped:
@@ -53,12 +58,14 @@ class LabScore:
                 self.bypassed += 1
 
     def reset(self) -> None:
+        """Clear the aggregate scoreboard."""
         with self._lock:
             self.attempts = 0
             self.stopped = 0
             self.bypassed = 0
 
     def snapshot(self) -> dict[str, int]:
+        """Return a consistent copy of the scoreboard."""
         with self._lock:
             return {"attempts": self.attempts, "stopped": self.stopped, "bypassed": self.bypassed}
 
@@ -67,12 +74,14 @@ class SessionStore:
     """In-memory, per-visitor gateways for the public sandbox."""
 
     def __init__(self, ttl: timedelta = PUBLIC_SESSION_TTL) -> None:
+        """Configure the idle lifetime for visitor sessions."""
         self.ttl = ttl
         self._sessions: dict[str, DemoSession] = {}
         self._lock = RLock()
 
     @staticmethod
     def valid_id(value: str | None) -> bool:
+        """Check whether a session identifier is a UUID."""
         if not value:
             return False
         try:
@@ -82,18 +91,20 @@ class SessionStore:
         return True
 
     def get_or_create(self, session_id: str | None = None) -> DemoSession:
+        """Retrieve an active visitor session or create an isolated gateway."""
         now = datetime.now(UTC)
         with self._lock:
             session = self._sessions.get(session_id or "")
             if session is not None and now - session.last_seen < self.ttl:
                 session.last_seen = now
                 return session
-            identifier = session_id if self.valid_id(session_id) else str(uuid4())
+            identifier = session_id if session_id is not None and self.valid_id(session_id) else str(uuid4())
             session = DemoSession(identifier, PolicyGateway(ledger=EventLedger(":memory:")))
             self._sessions[identifier] = session
             return session
 
     def get(self, session_id: str | None) -> DemoSession | None:
+        """Return an active session without creating a new one."""
         if not self.valid_id(session_id):
             return None
         now = datetime.now(UTC)
@@ -105,6 +116,7 @@ class SessionStore:
             return session
 
     def cleanup(self) -> int:
+        """Close and remove expired session ledgers."""
         cutoff = datetime.now(UTC) - self.ttl
         removed: list[DemoSession] = []
         with self._lock:
@@ -116,6 +128,7 @@ class SessionStore:
         return len(removed)
 
     def reset(self, session_id: str | None) -> DemoSession:
+        """Reset one visitor's gateway and lab counters."""
         session = self.get_or_create(session_id)
         session.gateway.reset()
         session.lab_attempts = 0
@@ -125,6 +138,7 @@ class SessionStore:
         return session
 
     def count(self) -> int:
+        """Count sessions currently held in memory."""
         with self._lock:
             return len(self._sessions)
 
@@ -138,6 +152,7 @@ class RequestRateLimiter:
         ip_limit: int = PUBLIC_IP_REQUEST_LIMIT,
         window: float = PUBLIC_REQUEST_WINDOW,
     ) -> None:
+        """Set independent per-session and per-IP request budgets."""
         self.session_limit = session_limit
         self.ip_limit = ip_limit
         self.window = window
@@ -145,6 +160,7 @@ class RequestRateLimiter:
         self._lock = RLock()
 
     def allow(self, session_key: str, ip_key: str) -> bool:
+        """Consume one request from both budgets when available."""
         now = monotonic()
         with self._lock:
             entries: list[tuple[str, float, int]] = []
@@ -160,6 +176,7 @@ class RequestRateLimiter:
             return True
 
     def clear(self) -> None:
+        """Forget all request-window counters."""
         with self._lock:
             self._hits.clear()
 

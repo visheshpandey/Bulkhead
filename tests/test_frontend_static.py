@@ -10,6 +10,15 @@ import pytest
 
 ROOT = Path(__file__).parents[1]
 STATIC = ROOT / "app" / "static"
+MODULES = (
+    "core.js", "activity.js", "rules.js", "drawer.js", "exports.js", "arena.js",
+    "lab.js", "integrate.js", "guide.js", "evaluate.js", "app.js",
+)
+
+
+def frontend_source() -> str:
+    """Read the real imported frontend modules, not a test-only bundle."""
+    return "\n".join((STATIC / name).read_text(encoding="utf-8") for name in MODULES)
 
 
 def test_scenarios_are_pure_json_with_fifteen_distinct_actions() -> None:
@@ -76,19 +85,22 @@ def test_force_push_fixture_uses_github_action_push_target() -> None:
 
 
 def test_frontend_does_not_inject_server_html_or_run_legacy_demo() -> None:
-    script = (STATIC / "app.js").read_text(encoding="utf-8")
+    script = frontend_source()
     assert "innerHTML" not in script
     assert 'request("/api/demo"' not in script
     assert 'request("/api/default-intent"' in script
     assert 'addEventListener("audit_event"' in script
-    assert 'window.setInterval(() => { if (!arenaPlaying) sync({ silent: true }); }, 3000)' in script
+    assert 'pollTimer = window.setInterval(() => { if (visible() && !arenaIsPlaying()) sync({ silent: true }); }, LIVE_POLL_MS)' in script
+    assert "export const MAX_TIMELINE_EVENTS = 200" in script
+    assert "export const SEARCH_DEBOUNCE_MS = 200" in script
+    assert "document.visibilityState === \"hidden\"" in script
     assert 'Too many requests — wait a few seconds and press Replay' in script
 
 
 def test_frontend_branding_and_download_metadata_use_bulkhead() -> None:
     html = (STATIC / "index.html").read_text(encoding="utf-8")
     css = (STATIC / "styles.css").read_text(encoding="utf-8")
-    script = (STATIC / "app.js").read_text(encoding="utf-8")
+    script = frontend_source()
     assert "Bulkhead — Agent policy gateway" in html
     assert "Without Bulkhead" in html
     assert 'class="box-bulkhead"' in html
@@ -102,6 +114,7 @@ def test_frontend_branding_and_download_metadata_use_bulkhead() -> None:
 
 def test_static_assets_are_versioned_and_dashboard_is_not_cached() -> None:
     html = (STATIC / "index.html").read_text(encoding="utf-8")
+    assert 'type="module"' in html
     assert 'href="/static/styles.css?v=4b874e6"' in html
     assert 'href="/static/enhance.css?v=4b874e6"' in html
     assert 'src="/static/app.js?v=4b874e6"' in html
@@ -110,7 +123,7 @@ def test_static_assets_are_versioned_and_dashboard_is_not_cached() -> None:
 def test_final_copy_contracts_are_present() -> None:
     html = (STATIC / "index.html").read_text(encoding="utf-8")
     scenarios = json.loads((STATIC / "scenarios.json").read_text(encoding="utf-8"))
-    script = (STATIC / "app.js").read_text(encoding="utf-8")
+    script = frontend_source()
     assert 'id="without-result"' in html and "✗ Your passwords were stolen" in script
     assert "A repeat of an earlier attack was blocked by a rule." in script
     assert "All events (JSON)" in html and "Complete event ledger." in html
@@ -131,7 +144,7 @@ def test_final_copy_contracts_are_present() -> None:
 
 def test_arena_final_polish_contracts_are_present() -> None:
     css = (STATIC / "styles.css").read_text(encoding="utf-8")
-    script = (STATIC / "app.js").read_text(encoding="utf-8")
+    script = frontend_source()
     for label in ("Read the page", "Opened your passwords", "Sent to attacker", "Answered"):
         assert label in script
     assert "✗ Your passwords were stolen" in script
@@ -173,7 +186,7 @@ def test_coding_agent_hook_snippets_match_the_real_hook() -> None:
 def test_frontend_form_errors_and_table_layout_contracts_are_explicit() -> None:
     html = (STATIC / "index.html").read_text(encoding="utf-8")
     css = (STATIC / "styles.css").read_text(encoding="utf-8")
-    script = (STATIC / "app.js").read_text(encoding="utf-8")
+    script = frontend_source()
     assert "Enter a target path, command or URL." in script
     assert "Payload must be valid JSON." in script
     assert 'id="action-payload-error"' in html
@@ -187,7 +200,7 @@ def test_frontend_form_errors_and_table_layout_contracts_are_explicit() -> None:
 
 
 def test_script_controls_exist_in_dashboard_markup() -> None:
-    script = (STATIC / "app.js").read_text(encoding="utf-8")
+    script = frontend_source()
     html = (STATIC / "index.html").read_text(encoding="utf-8")
     ids = set(re.findall(r'id="([^"]+)"', html))
     referenced = set(re.findall(r'\$\("([\w-]+)"\)', script))
@@ -211,7 +224,7 @@ def test_table_headers_match_rendered_cell_contract() -> None:
 def test_plain_theme_has_no_decorative_dashboard_effects() -> None:
     html = (STATIC / "index.html").read_text(encoding="utf-8")
     css = (STATIC / "styles.css").read_text(encoding="utf-8")
-    script = (STATIC / "app.js").read_text(encoding="utf-8")
+    script = frontend_source()
     for forbidden in ("gradient(", "@keyframes", "#a6f26f", "text-transform: uppercase; } h1"):
         assert forbidden not in css
     for forbidden in ("eyebrow", "Trust topology", "Quarantine perimeter", "Threat posture", "Rule generator idle"):
